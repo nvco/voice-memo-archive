@@ -37,15 +37,24 @@ what's done and what to do next._
   collapses to an empty string instead of the runs/attributeTable object —
   the format-independent "no transcript" signal a parser must detect. See
   Findings.
+- Wrote a first draft of the extraction result contract (`status`
+  classifications, and the `transcript_text`/`timing`/`locale`/
+  `extraction_format_version` fields) directly from the accumulated
+  Findings — see "Draft extraction result contract" below. Confirmed
+  run-concatenation join behavior (no separator needed) as part of this.
 
 **Not done yet — next action:**
 
+- The draft contract's `absent`, `unreadable`, `malformed`, and
+  `incomplete` statuses are defined but not yet observed on a real
+  sample — only `ok` and `empty` are confirmed. See the draft's "Open
+  questions" for what's needed to close each.
 - A non-`en_US` locale sample is still untested (skipped this session).
 - iCloud stability signals (repeat-read consistency across a delayed
   download) not yet tested.
-- No extraction-result contract or support matrix has been drafted yet —
-  enough transcript-shape evidence is now in hand to draft a first version
-  of the contract (see Findings); that's the next concrete step.
+- Support matrix (macOS version, source device, language/region, format,
+  local availability, known unsupported variants) still not written —
+  only the format/channel-layout part of it has evidence so far.
 - FDA behavior was only observed from a developer-shell host process (VS
   Code's integrated terminal), not a packaged/signed executable — that
   part of the roadmap item remains unverified until Phase 8 produces one.
@@ -137,15 +146,15 @@ acceptable.
 
 - [x] Verify transcript location, payload encoding, text presence, available
       time ranges, locale, and layout variation for `.m4a` and for `.qta`.
-      _All confirmed on real samples (S5–S9) — see Findings: location
+      _All confirmed on real samples (S5–S11) — see Findings: location
       (`tsrp` box for `.m4a`; metadata-keyed `mdta:com.apple.VoiceMemos.tsrp`
       for `.qta`), encoding (UTF-8 JSON), text presence (non-empty
-      `runs`/`attributeTable` on every sample checked), timing
-      (word/phrase-level `[start, end]` seconds), locale
-      (`locale.identifier`, e.g. `en_US`), and layout variation
-      (mono/stereo/spatial, confirmed earlier). Not yet covered: an
-      empty/no-transcript sample, and a non-`en_US` locale — see "Open
-      items for later phases."_
+      `runs`/`attributeTable` on every non-empty sample, and the
+      empty-string collapse confirmed on both formats for the no-speech
+      case — S10/S11), timing (word/phrase-level `[start, end]` seconds),
+      locale (`locale.identifier`, e.g. `en_US`), and layout variation
+      (mono/stereo/spatial, confirmed earlier). Not yet covered: a
+      non-`en_US` locale sample — see "Open items for later phases."_
 - [x] Establish whether `.qta` uses a direct `tsrp` atom, a metadata-keyed
       transcript value, or both, from real evidence rather than assumption.
       _Confirmed: `.qta` uses the metadata-keyed path only (no direct
@@ -167,7 +176,12 @@ acceptable.
 - [ ] Define the narrow extraction result contract: native transcript text;
       available native timing and locale; source format; extraction-format
       version; and classifications for absent, unreadable, malformed,
-      incomplete, and unsupported data.
+      incomplete, and unsupported data. _First draft written — see "Draft
+      extraction result contract" below. `ok` and `empty` are confirmed
+      against real samples; `absent`, `unreadable`, `malformed`, and
+      `incomplete` are defined but not yet observed/verified on a real
+      sample, so this stays unchecked until they are or the draft is
+      otherwise validated._
 - [ ] Produce a support matrix (macOS version, source device, language/region,
       format, local availability, known unsupported variants). _Partial
       evidence gathered (mono/stereo/spatial mapping by format); matrix
@@ -237,6 +251,12 @@ outcome._
   no-speech test. Outcome: succeeded; direct `tsrp` box present at the
   same location as S8/S9, showing the identical empty-string
   `attributedString` collapse seen on S10 — see Findings.
+- 2026-09-08: re-opened S6 and S8 (already-inspected multi-run samples) to
+  check one further structural fact — whether each run string in `runs`
+  starts/ends with whitespace (boundary-character check only; run content
+  itself not read) — to determine transcript-text join behavior for the
+  draft extraction contract. Outcome: succeeded; consistent pattern found
+  on both samples (see Findings and "Draft extraction result contract").
 
 ## Findings
 
@@ -381,6 +401,99 @@ proceeds._
   the original recording's own `tsrp` transcript is intact, well-formed,
   and matches the same JSON schema as the other `.m4a` samples. The failed
   append did not corrupt or remove the existing transcript.
+- **Run-boundary spacing (S6, S8)**: checked each run string's leading/
+  trailing character class (not its content) across both samples. Pattern
+  was identical and 100% consistent: run 0 has no leading space, every
+  run after it has exactly one leading space, and no run has a trailing
+  space. Plain in-order concatenation of `runs`' text elements
+  reconstructs the transcript with correct word spacing — no separator or
+  join logic needed.
+
+## Draft extraction result contract
+
+_First draft of the "Scope and decisions to validate" contract item, built
+directly from the Findings above. This defines the shape of what Phase 2's
+extraction step returns for one recording — not an implementation, and not
+yet exercised against every case (see gaps noted per field). Revise this
+draft rather than starting a second one as more evidence arrives._
+
+**Result fields:**
+
+- `status` — one of the classifications below. Always present.
+- `source_format` — `"m4a"` or `"qta"`, from the file extension actually
+  opened (not inferred from anything else).
+- `transcript_text` — the reconstructed transcript string, built by
+  concatenating `attributedString.runs`' text-run strings **in order with
+  no separator** (`"".join(...)`). Confirmed on S6 (21 runs) and S8 (15
+  runs): the first run has no leading space, every subsequent run has a
+  leading space and no trailing space — so inter-word spacing is already
+  embedded in each run and plain concatenation reproduces the transcript
+  correctly. (Checked structurally only — each run string's first/last
+  character class, never its content — per this file's evidence rules.)
+  Present only when `status == "ok"`; `None` otherwise.
+- `timing` — a list of `(start_seconds, end_seconds)` pairs, one per run,
+  aligned 1:1 with the runs that make up `transcript_text` (via each run's
+  `attributeTable` index). Present only when `status == "ok"`.
+- `locale` — `locale.identifier` as found (e.g. `"en_US"`), present
+  whenever the transcript entry itself was found and its JSON parsed,
+  regardless of whether it held text (`ok` or `empty`); `None` for
+  `absent`, `unreadable`, `malformed`, or `unsupported`.
+- `extraction_format_version` — an integer versioning this result shape
+  itself (not the source recording). Bump it on any breaking change to
+  this contract so `state.json` can detect a stale prior extraction.
+
+**`status` classifications:**
+
+- `ok` — transcript entry found, parsed, and `attributedString` is the
+  non-empty runs/attributeTable object. Confirmed shape: S6–S9, S5, S11.
+- `empty` — transcript entry found and parsed, but `attributedString` is
+  the empty string (no speech content was transcribed). Per this
+  project's invariant ("do not create archive files for empty or
+  transcript-less recordings"), `empty` and `absent` both result in no
+  archive file being written — but they stay distinct statuses here
+  because they likely need different handling in `state.json`'s retry
+  tracking (see the open question below). Confirmed shape: S10, S11.
+- `absent` — no `tsrp` box (`.m4a`) and no `mdta`/
+  `com.apple.VoiceMemos.tsrp` metadata key (`.qta`) found anywhere in the
+  container. Not yet observed on a real sample this session — every
+  sample opened so far had at least the empty-string case. Left as a
+  distinct status because it plausibly means something different from
+  `empty` (e.g. transcription still pending vs. confirmed no speech) —
+  unconfirmed; a real `absent` sample hasn't been captured yet.
+- `unreadable` — the file or container could not be opened or read at all
+  (I/O error, permission denied, still downloading from iCloud). Not
+  triggered by anything about the transcript entry specifically.
+- `malformed` — the transcript entry was found, but its bytes did not
+  parse as valid JSON, or the parsed JSON's top level did not match
+  `{"locale": ..., "attributedString": ...}`. Not yet observed on a real
+  sample — every sample this session parsed cleanly.
+- `incomplete` — the transcript entry parsed as JSON with the expected
+  top-level shape, but an internal invariant this session established
+  didn't hold (e.g. `runs` length isn't `2 ×` `attributeTable` length, or
+  an `attributeTable` entry is missing `timeRange`, or `timeRange` isn't
+  a 2-element ascending pair). Not yet observed on a real sample.
+- `unsupported` — the file extension isn't `.m4a`/`.qta`, or the
+  container layout doesn't match either of the two confirmed lookup paths
+  (direct `tsrp` under `trak/udta` for `.m4a`; `mdta`-keyed entry under
+  the first `trak`'s classic-QuickTime `meta` for `.qta`) closely enough
+  to say the entry is genuinely `absent` rather than just differently
+  laid out. Guards against silently misreading a container shape this
+  investigation hasn't seen (e.g. a future macOS/Voice-Memos version that
+  changes the layout).
+
+**Open questions before Phase 2 can implement against this contract:**
+
+- Whether `absent` is reachable in practice (vs. Voice Memos always
+  writing at least the empty-string shape once a recording exists) is
+  unconfirmed — needs a sample from a state where transcription hasn't
+  run yet, if such a state is even observable locally.
+- Whether `empty` and `absent` need different `state.json` retry
+  behavior (e.g. retry `absent` a few times in case transcription is
+  still catching up, but treat `empty` as final) is a Phase 3 design
+  question, not answered here.
+- This contract has only been checked against `en_US` samples; a
+  non-`en_US` locale sample (open item below) may reveal a shape this
+  draft doesn't account for.
 
 ## Open items for later phases
 
