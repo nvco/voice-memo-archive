@@ -9,3 +9,6 @@
 
 # OS
 Thumbs.db
+
+# Local agent tool config (per-machine, not shared)
+.claude/settings.local.json

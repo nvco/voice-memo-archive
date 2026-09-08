@@ -6,8 +6,48 @@ goal or exit criteria beyond what is needed to execute the work.
 
 ## Status
 
-Not started. Real fixture inspection must not begin until this plan is
-approved.
+_Last updated: 2026-09-08. Read this section first in a new session to see
+what's done and what to do next._
+
+**Done:**
+
+- Confirmed Full Disk Access is required even for a read-only directory
+  listing of the configured Recordings folder, and what the denial looks
+  like (`Operation not permitted`). Granted for this session's host app.
+- Completed read-only structural inspection (`afinfo`, `ls`, `plutil -p` —
+  no content decode, no transcript access) of 5 real samples: S1 (mono
+  `.m4a`), S2 (stereo `.m4a`), S3 (spatial `.qta`), S4 (spatial `.qta`),
+  S5 (an older mono `.m4a` whose filename lacks the usual ID suffix, plus
+  its `.composition/manifest.plist` sidecar). See Session log and Findings.
+- Established that `.m4a` carries mono or stereo in a single track, and
+  `.qta` carries a spatial dual-track layout (stereo AAC + 4ch ambisonic
+  `apac`) — see Findings for the evidence and its confidence level.
+- Found and documented the composition-sidecar pattern that explains a
+  filename with no ID suffix (canonical ID lives in an adjacent
+  `.composition/manifest.plist`'s `RCSavedRecordingUUID`), with a concrete
+  Phase 3 follow-up recorded under "Open items for later phases."
+
+**Not done yet — next action:**
+
+- **Transcript payload has not been probed on any sample.** No `tsrp` atom
+  or metadata-keyed transcript lookup has been run yet. This is the next
+  step: for each of the 5 samples already opened, determine where the
+  Apple-generated transcript actually lives and in what structural shape —
+  read-only, structural facts only, no transcript text retained (see
+  "Non-sensitive evidence to retain" below).
+- iCloud stability signals (repeat-read consistency across a delayed
+  download) not yet tested.
+- No extraction-result contract or support matrix has been drafted —
+  both depend on the transcript-location finding above.
+- FDA behavior was only observed from a developer-shell host process (VS
+  Code's integrated terminal), not a packaged/signed executable — that
+  part of the roadmap item remains unverified until Phase 8 produces one.
+
+**Before opening any *additional* real sample in a new session**, re-confirm
+the "Focused acceptance checks" below per this file's own protocol —
+approval does not carry forward across sessions automatically. The 5
+samples already logged do not need re-approval to keep referencing their
+existing findings.
 
 ## Read-only inspection approach
 
@@ -88,23 +128,34 @@ acceptable.
 
 ## Scope and decisions to validate (from the roadmap)
 
-- Verify transcript location, payload encoding, text presence, available
-  time ranges, locale, and layout variation for `.m4a` and for `.qta`.
-- Establish whether `.qta` uses a direct `tsrp` atom, a metadata-keyed
-  transcript value, or both, from real evidence rather than assumption.
-- Verify the default source path,
-  `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`,
-  and confirm actual Full Disk Access behavior for a packaged (non-developer-shell)
-  process before relying on it.
-- Establish iCloud stability signals (size, mtime, structure, repeat-read
-  consistency) sufficient to avoid classifying a still-downloading file as
-  empty or transcript-less on a single read.
-- Define the narrow extraction result contract: native transcript text;
-  available native timing and locale; source format; extraction-format
-  version; and classifications for absent, unreadable, malformed,
-  incomplete, and unsupported data.
-- Produce a support matrix (macOS version, source device, language/region,
-  format, local availability, known unsupported variants).
+- [ ] Verify transcript location, payload encoding, text presence, available
+      time ranges, locale, and layout variation for `.m4a` and for `.qta`.
+      _Layout variation (mono/stereo/spatial track structure) is confirmed —
+      see Findings. Transcript location/encoding/text/timing/locale is not
+      yet probed; this is the next action._
+- [ ] Establish whether `.qta` uses a direct `tsrp` atom, a metadata-keyed
+      transcript value, or both, from real evidence rather than assumption.
+- [ ] Verify the default source path,
+      `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`,
+      and confirm actual Full Disk Access behavior for a packaged
+      (non-developer-shell) process before relying on it. _Partially
+      confirmed: the path is correct, FDA is required, and the denial is
+      diagnosable (`Operation not permitted`) with no programmatic
+      grant/prompt available — but this was only observed from a
+      developer-shell host process (VS Code's integrated terminal), not a
+      packaged/signed executable, since none exists yet (Phase 8). Leave
+      unchecked until re-verified against an actual packaged process._
+- [ ] Establish iCloud stability signals (size, mtime, structure, repeat-read
+      consistency) sufficient to avoid classifying a still-downloading file
+      as empty or transcript-less on a single read.
+- [ ] Define the narrow extraction result contract: native transcript text;
+      available native timing and locale; source format; extraction-format
+      version; and classifications for absent, unreadable, malformed,
+      incomplete, and unsupported data.
+- [ ] Produce a support matrix (macOS version, source device, language/region,
+      format, local availability, known unsupported variants). _Partial
+      evidence gathered (mono/stereo/spatial mapping by format); matrix
+      itself not yet written._
 
 ## Exit criteria
 
@@ -124,14 +175,96 @@ _Append one entry per real-sample inspection session: date, tool/command
 used, sample identifier (not filename — an opaque local label is fine),
 outcome._
 
-(none yet)
+- 2026-09-08: `ls -la` on the configured Recordings folder (read-only
+  directory listing; no file opened). Outcome: succeeded after Full Disk
+  Access was granted to the host app; first attempt failed with
+  `Operation not permitted` (see Findings — this is itself a finding).
+- 2026-09-08: `afinfo <file>` (read-only container/format-header parse, no
+  decode/playback) on samples S1–S4 (the four most recently recorded
+  files at the time, one per format/channel combination available).
+  Outcome: succeeded on all four.
+- 2026-09-08: `afinfo <file>` and `ls -la <dir>` on sample S5 (an older
+  recording whose filename lacks the usual ID suffix) and its adjacent
+  `.composition/` directory. Outcome: succeeded.
+- 2026-09-08: `plutil -p manifest.plist` (read-only plist pretty-print, no
+  modification) inside S5's `.composition/` directory. Outcome: succeeded.
 
 ## Findings
 
 _Non-sensitive evidence only, per the section above. Append as inspection
 proceeds._
 
-(none yet)
+- **FDA is required even for a plain read-only directory listing.** A first
+  `ls` attempt against the configured Recordings folder failed with
+  `Operation not permitted` until Full Disk Access was granted to the host
+  process. There is no programmatic request/prompt for this permission
+  (unlike camera/mic/contacts) — it must be granted manually in System
+  Settings → Privacy & Security → Full Disk Access, per-app (per bundle
+  identifier), all-or-nothing. Confirms Phase 1/8's note to diagnose this
+  from the real executable rather than assume shell access.
+- **Filename grammar**: most recordings follow `YYYYMMDD HHMMSS-<ID>.ext`.
+  Sample count observed: ~30 recordings, mixed `.m4a`/`.qta`, ranging
+  roughly 4KB–6.4MB.
+- **Non-candidate entries discovery must skip**, seen directly in the
+  configured Recordings folder: `*-track0.waveform` sidecar files,
+  `*.composition/` directories, `Capture/`, `CaptureRecovery/`,
+  `.CloudRecordings_SUPPORT/`, `CloudRecordings_ckAssets/`, and the
+  database files `CloudRecordings.db`, `CloudRecordings.db-shm`,
+  `CloudRecordings.db-wal` (not opened, per the project's database
+  invariant).
+- **Format/channel layout (samples S1–S4, via `afinfo`)**:
+  - `.m4a`, 1 track, 1ch AAC → **mono**.
+  - `.m4a`, 1 track, 2ch AAC → **stereo**.
+  - `.qta`, 2 tracks: Track 1 = 2ch AAC (stereo fallback), Track 2 = 4ch
+    `apac` "High-Order Ambisonics, ACN/SN3D" → **spatial**. Observed on two
+    independent `.qta` samples.
+  - Working hypothesis: `.qta` is used specifically for spatial-audio
+    recordings (dual-track: stereo + ambisonic); `.m4a` covers both mono
+    and stereo in a single track. Not yet tested against a larger sample.
+- **Filename-less-ID case (sample S5)**: `.m4a`, 1 track, 1ch AAC (mono) —
+  same audio format as an ID'd mono sample, so audio format/channel count
+  does not explain ID absence in the filename.
+  - S5 has an adjacent `<timestamp>.composition/` directory containing
+    `manifest.plist` and an empty `fragments/` directory.
+  - `manifest.plist` (plist structure only) contains: `RCComposedAVURL`
+    (points back to the sibling `.m4a`), `RCDecomposedFragments` (an empty
+    array — no audio segments were actually merged), `RCSavedRecordingCreationDate`
+    / `RCSavedRecordingCreationTime` (matches the filename timestamp),
+    `RCSavedRecordingUUID` (a UUID — the recording's real, canonical ID),
+    and `RCSavedRecordingTitle` (a user-entered title — value redacted
+    here per this file's evidence rules; not retained).
+  - **Working conclusion**: a filename lacking an ID suffix does not mean
+    the recording has no ID. When Voice Memos' "add to existing recording"
+    flow is invoked (even if nothing ends up appended — `RCDecomposedFragments`
+    empty is consistent with that), it appears to write a
+    `.composition/manifest.plist` sidecar next to a plain-timestamp `.m4a`,
+    and the canonical ID lives in that sidecar's `RCSavedRecordingUUID`
+    field rather than in the filename.
+
+## Open items for later phases
+
+_Concrete follow-ups this investigation surfaced, to be picked up when the
+relevant phase's task file is created — listed here so they are not lost._
+
+- **Phase 3 (discovery/dedup)**: when a recording's filename lacks an ID
+  suffix, check for an adjacent `<timestamp>.composition/manifest.plist`
+  and use its `RCSavedRecordingUUID` as the dedup identity instead of
+  treating the file as malformed. Needs more samples to confirm this is
+  the only such case (vs. e.g. truly legacy/no-ID recordings with no
+  sidecar at all).
+- **Phase 3 (discovery)**: explicitly exclude `*.waveform`, `*.composition/`,
+  `Capture/`, `CaptureRecovery/`, `.CloudRecordings_SUPPORT/`,
+  `CloudRecordings_ckAssets/`, and `CloudRecordings.db*` from candidate
+  enumeration.
+- **Phase 1/8 (permissions/diagnostics)**: `doctor`-style diagnostics must
+  explicitly detect the FDA-denied case (e.g. `Operation not permitted` on
+  a folder read) and point the user to System Settings → Privacy &
+  Security → Full Disk Access, since macOS gives no programmatic prompt
+  for this permission.
+- **Phase 1 (support matrix)**: tentatively, `.qta` = spatial-audio
+  recordings (stereo + ambisonic dual-track), `.m4a` = mono or stereo
+  single-track. Needs confirmation across more samples before it's stated
+  as a rule rather than an observation.
 
 ## Deviations from the roadmap
 
