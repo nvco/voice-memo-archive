@@ -42,6 +42,10 @@ what's done and what to do next._
   `extraction_format_version` fields) directly from the accumulated
   Findings — see "Draft extraction result contract" below. Confirmed
   run-concatenation join behavior (no separator needed) as part of this.
+- Wrote a first draft of the support matrix directly from the accumulated
+  Findings plus one host-environment check (`sw_vers`, not a Voice Memos
+  sample) — see "Draft support matrix" below. No new sample was opened for
+  this.
 
 **Not done yet — next action:**
 
@@ -52,9 +56,10 @@ what's done and what to do next._
 - A non-`en_US` locale sample is still untested (skipped this session).
 - iCloud stability signals (repeat-read consistency across a delayed
   download) not yet tested.
-- Support matrix (macOS version, source device, language/region, format,
-  local availability, known unsupported variants) still not written —
-  only the format/channel-layout part of it has evidence so far.
+- The draft support matrix has four open rows needing real evidence:
+  packaged-process macOS/FDA verification, a non-`en_US` sample, an
+  iCloud-in-progress-download sample, and a source-device field (nothing
+  gathered so far populates it). See "Draft support matrix" below.
 - FDA behavior was only observed from a developer-shell host process (VS
   Code's integrated terminal), not a packaged/signed executable — that
   part of the roadmap item remains unverified until Phase 8 produces one.
@@ -183,9 +188,12 @@ acceptable.
       sample, so this stays unchecked until they are or the draft is
       otherwise validated._
 - [ ] Produce a support matrix (macOS version, source device, language/region,
-      format, local availability, known unsupported variants). _Partial
-      evidence gathered (mono/stereo/spatial mapping by format); matrix
-      itself not yet written._
+      format, local availability, known unsupported variants). _First draft
+      written — see "Draft support matrix" below. Format/channel-layout and
+      `en_US` rows are confirmed on real samples; macOS-version (dev-shell
+      only), source-device, non-`en_US`, and iCloud-in-progress rows remain
+      open, so this stays unchecked until they're closed or the draft is
+      otherwise validated._
 
 ## Exit criteria
 
@@ -257,6 +265,9 @@ outcome._
   itself not read) — to determine transcript-text join behavior for the
   draft extraction contract. Outcome: succeeded; consistent pattern found
   on both samples (see Findings and "Draft extraction result contract").
+- 2026-09-08: `sw_vers` (host OS version only — not a Voice Memos sample,
+  no recording opened). Outcome: succeeded; recorded in the draft support
+  matrix below.
 
 ## Findings
 
@@ -494,6 +505,38 @@ draft rather than starting a second one as more evidence arrives._
 - This contract has only been checked against `en_US` samples; a
   non-`en_US` locale sample (open item below) may reveal a shape this
   draft doesn't account for.
+
+## Draft support matrix
+
+_First draft of the "Produce a support matrix" scope item, built directly
+from the Findings above and one host-environment check (`sw_vers`). No new
+sample was opened to write this draft. Confirmed rows cite the samples that
+evidence them; every other row is an explicit open item, not an assumption._
+
+| Dimension | Value | Status | Evidence |
+|---|---|---|---|
+| macOS version (dev host) | 26.6.2 (build 25G83) | Confirmed for this dev-shell session only | `sw_vers`, this session |
+| macOS version (packaged process) | — | **Open** — no packaged/signed executable exists yet (Phase 8) | — |
+| Format | `.m4a`, mono, 1 track | Supported | S1, S5, S8, S9, S11 |
+| Format | `.m4a`, stereo, 1 track | Supported | S2 |
+| Format | `.qta`, spatial (2 tracks: stereo AAC + 4ch ambisonic `apac`) | Supported | S3, S4, S6, S7, S10 |
+| Format | any extension other than `.m4a`/`.qta` | Unsupported (explicit `unsupported` status in the draft extraction contract) | Not observed in the configured Recordings folder this session |
+| Source device | — | **Open** — not captured; device-model metadata wasn't inspected (out of scope for structural findings so far) | — |
+| Language/region | `en_US` | Supported and confirmed | All 11 samples (S1–S11) |
+| Language/region | non-`en_US` | **Open** — untested this session | — |
+| Local availability | fully downloaded local file | Supported | All 11 samples were locally readable without a network fetch |
+| Local availability | file still downloading from iCloud (partial/placeholder on disk) | **Open** — untested; no repeat-read/stability check performed yet | — |
+| Known unsupported variant | none confirmed yet | **Open** — no sample has hit `absent`, `malformed`, `incomplete`, or `unsupported` in practice | — |
+
+**Working conclusion**: `.qta` = spatial-audio recordings only (dual-track
+stereo + ambisonic); `.m4a` covers mono and stereo in a single track — see
+"Open items for later phases" for the existing note that this needs
+confirmation across more samples before being stated as a hard rule.
+
+**Gaps this draft leaves for the scope item to close** (mirrors the
+"Not done yet" list in Status): packaged-process macOS/FDA verification,
+a non-`en_US` sample, an iCloud-in-progress-download sample, and a source
+device field, which nothing gathered so far actually populates.
 
 ## Open items for later phases
 
