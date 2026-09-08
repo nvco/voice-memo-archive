@@ -20,6 +20,11 @@ own "Plan history," and per-task deviations live in each task-plan file.
   `.claude/skills/wrap-up`): an end-of-session checkpoint that updates the
   active task file's Status section and proposes a commit, so a new session
   can pick up exactly where the previous one left off.
+- Added a matching `.agents/skills/wrap-up` symlink so Codex CLI (which
+  discovers skills via `.agents/skills`, not the root `skills/` folder) can
+  find the same skill. Added `skills/README.md` pointing back to AGENTS.md's
+  "Shared skills" section so the symlink layout isn't mistaken for
+  duplication.
 - Phase 1 (in progress): began real-fixture inspection under
   `tasks/005-platform-feasibility-and-data-contract.md`. Confirmed Full
   Disk Access is required (with no programmatic prompt) to read the
