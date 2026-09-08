@@ -47,22 +47,29 @@ what's done and what to do next._
   sample) — see "Draft support matrix" below. No new sample was opened for
   this.
 
-**Not done yet — next action:**
+**Not done yet — deprioritized, not blocking:**
 
 - The draft contract's `absent`, `unreadable`, `malformed`, and
   `incomplete` statuses are defined but not yet observed on a real
-  sample — only `ok` and `empty` are confirmed. See the draft's "Open
-  questions" for what's needed to close each.
-- A non-`en_US` locale sample is still untested (skipped this session).
-- iCloud stability signals (repeat-read consistency across a delayed
-  download) not yet tested.
-- The draft support matrix has four open rows needing real evidence:
-  packaged-process macOS/FDA verification, a non-`en_US` sample, an
-  iCloud-in-progress-download sample, and a source-device field (nothing
-  gathered so far populates it). See "Draft support matrix" below.
+  sample — only `ok` and `empty` are confirmed. Per the "Deviations"
+  section below, the user has decided not to chase these on manufactured
+  samples for now; the draft contract's design is being treated as
+  sufficient to proceed.
+- A non-`en_US` locale sample and iCloud-in-progress-download stability
+  signals are likewise untested and deprioritized for the same reason —
+  not practical to manufacture on demand, not a current priority.
+- The draft support matrix's four open rows (packaged-process macOS/FDA,
+  non-`en_US`, iCloud-in-progress, source device) stand as documented
+  gaps rather than blockers. See "Draft support matrix" below.
 - FDA behavior was only observed from a developer-shell host process (VS
-  Code's integrated terminal), not a packaged/signed executable — that
-  part of the roadmap item remains unverified until Phase 8 produces one.
+  Code's integrated terminal), not a packaged/signed executable — this
+  one remains genuinely blocked (not deprioritized) until Phase 8
+  produces a packaged executable to test against.
+
+**Next action:** proceed to Phase 2 (Foundation and test harness) per
+`tasks/000-initial-build.md`, using the draft extraction contract and
+support matrix as-is. Revisit any of the deprioritized items above if a
+real instance turns up naturally in later-phase work.
 
 **Before opening any *additional* real sample in a new session**, re-confirm
 the "Focused acceptance checks" below per this file's own protocol —
@@ -589,4 +596,20 @@ relevant phase's task file is created — listed here so they are not lost._
 _Record any material deviation from `tasks/000-initial-build.md` Phase 1
 here, per `AGENTS.md`'s working method._
 
-(none yet)
+- 2026-09-08: User decided to stop pursuing real samples for the three
+  remaining sample-dependent gaps (a non-`en_US` locale recording, an
+  in-progress iCloud download, and a sample that actually triggers
+  `absent`/`malformed`/`incomplete`) — these aren't practical to
+  manufacture on demand and aren't considered a current priority. The
+  draft extraction contract and support matrix already define how these
+  cases are meant to be handled; that theoretical coverage is being
+  treated as sufficient to proceed, rather than blocking on real-sample
+  confirmation. Phase 1's exit criteria bullet "distinguish no transcript
+  from incomplete, inaccessible, malformed, or unsupported content" is
+  therefore being treated as satisfied by the draft contract's design,
+  not by observed evidence, for these specific statuses — left unchecked
+  below to keep that distinction visible; revisit if a real instance of
+  one of these cases turns up naturally during later-phase work (e.g. a
+  Phase 4 golden-fixture test surfaces one, or a real scan produces one).
+  Packaged-process FDA verification remains genuinely blocked on Phase 8
+  (no packaged executable exists) rather than deprioritized by choice.
