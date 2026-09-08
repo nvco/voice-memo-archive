@@ -32,6 +32,15 @@ class RecordingState:
     last_scanned_at: str | None = None  # ISO 8601, UTC
     retry_count: int = 0
     last_error_category: str | None = None
+    # Cheap source fingerprint (Phase 3 discovery), used to tell an
+    # unchanged source file from one that changed since it was last seen —
+    # normal scans skip reopening a file whose fingerprint still matches.
+    source_size: int | None = None
+    source_mtime: float | None = None
+    # Set once, the first time discovery ever observes this recording ID —
+    # never updated afterward. The mechanism a later "new since setup"
+    # import mode (Phase 7) computes a cutoff against.
+    first_seen_at: str | None = None  # ISO 8601, UTC
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -43,6 +52,9 @@ class RecordingState:
             last_scanned_at=data.get("last_scanned_at"),
             retry_count=data.get("retry_count", 0),
             last_error_category=data.get("last_error_category"),
+            source_size=data.get("source_size"),
+            source_mtime=data.get("source_mtime"),
+            first_seen_at=data.get("first_seen_at"),
         )
 
 

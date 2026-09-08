@@ -20,7 +20,7 @@ When an issue changes product intent, update the brief first. When it changes se
 1. [ ] Platform feasibility and data contract
 2. [x] Foundation and test harness
 3. [ ] File discovery and source metadata
-4. [ ] Native transcript extraction and fidelity
+4. [x] Native transcript extraction and fidelity
 5. [ ] Archive output, deduplication, and conflicts
 6. [ ] Operational state, retries, and recovery
 7. [ ] Setup, automation, and diagnostics
@@ -150,9 +150,9 @@ Phases 1 through 3.
 
 ### Exit criteria
 
-- [ ] Each supported layout produces the native transcript or a precise non-success classification.
-- [ ] A blank transcript cannot become a successful archive candidate.
-- [ ] Golden tests establish text fidelity, Unicode behavior, timing/locale preservation, and bounded failure on corrupted containers.
+- [x] Each supported layout produces the native transcript or a precise non-success classification.
+- [x] A blank transcript cannot become a successful archive candidate.
+- [x] Golden tests establish text fidelity, Unicode behavior, timing/locale preservation, and bounded failure on corrupted containers.
 
 ## Phase 5: Archive output, deduplication, and conflicts
 

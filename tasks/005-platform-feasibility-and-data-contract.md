@@ -455,7 +455,11 @@ draft rather than starting a second one as more evidence arrives._
 - `locale` — `locale.identifier` as found (e.g. `"en_US"`), present
   whenever the transcript entry itself was found and its JSON parsed,
   regardless of whether it held text (`ok` or `empty`); `None` for
-  `absent`, `unreadable`, `malformed`, or `unsupported`.
+  `absent`, `unreadable`, `malformed`, or `unsupported`. **Phase 4
+  refinement:** also present for `incomplete` — an `incomplete` result by
+  definition already parsed the top-level JSON (including `locale`)
+  successfully; only the `runs`/`attributeTable` invariant failed, so
+  there's no reason to withhold a value the code already has.
 - `extraction_format_version` — an integer versioning this result shape
   itself (not the source recording). Bump it on any breaking change to
   this contract so `state.json` can detect a stale prior extraction.
@@ -484,20 +488,49 @@ draft rather than starting a second one as more evidence arrives._
 - `malformed` — the transcript entry was found, but its bytes did not
   parse as valid JSON, or the parsed JSON's top level did not match
   `{"locale": ..., "attributedString": ...}`. Not yet observed on a real
-  sample — every sample this session parsed cleanly.
+  sample — every sample this session parsed cleanly. **Phase 4
+  refinement:** broadened to also cover a container that itself fails to
+  parse structurally (truncated/corrupt ISO-BMFF/QuickTime atoms, e.g. a
+  box whose declared size runs past the file or its parent) — the
+  original wording only covered "the transcript entry was found, but..."
+  and had no bucket for a broken container that never yields an entry to
+  examine in the first place. `unreadable` stays reserved strictly for
+  the file/container not being openable or readable at the I/O level at
+  all (permission denied, still downloading); `malformed` is for a file
+  that opened fine but whose bytes don't parse as the expected container
+  or JSON shape.
 - `incomplete` — the transcript entry parsed as JSON with the expected
   top-level shape, but an internal invariant this session established
   didn't hold (e.g. `runs` length isn't `2 ×` `attributeTable` length, or
   an `attributeTable` entry is missing `timeRange`, or `timeRange` isn't
   a 2-element ascending pair). Not yet observed on a real sample.
-- `unsupported` — the file extension isn't `.m4a`/`.qta`, or the
-  container layout doesn't match either of the two confirmed lookup paths
-  (direct `tsrp` under `trak/udta` for `.m4a`; `mdta`-keyed entry under
-  the first `trak`'s classic-QuickTime `meta` for `.qta`) closely enough
-  to say the entry is genuinely `absent` rather than just differently
-  laid out. Guards against silently misreading a container shape this
-  investigation hasn't seen (e.g. a future macOS/Voice-Memos version that
-  changes the layout).
+- `unsupported` — the file extension isn't `.m4a`/`.qta`. **Phase 4
+  refinement:** narrowed to extension-only. The original wording also
+  covered "the container layout doesn't match either confirmed lookup
+  path closely enough to say the entry is genuinely absent rather than
+  differently laid out," but implementing that clause would mean
+  guessing whether a structurally-valid-but-unfamiliar container shape is
+  "a future layout we don't understand" vs. "genuinely has no transcript"
+  — with no real evidence to tell the two apart, that's exactly the kind
+  of interpretation `AGENTS.md` says to avoid. A container that's present
+  and parses but doesn't match either known lookup path now falls out as
+  `absent` per that status's own definition below ("no `tsrp` box... and
+  no `mdta`/`com.apple.VoiceMemos.tsrp` key... found anywhere in the
+  container") — which already says exactly that, without inventing a new
+  detection heuristic. If a real future-layout case ever turns up, it
+  should be handled by extending the lookup paths (or reopening this
+  status), not by guessing at parse time.
+
+**Phase 4 implementation status (2026-09-08):** all seven statuses are now
+implemented in `extraction.py` and exercised by synthetic-container tests
+in `tests/test_extraction.py` (`ok`, `empty`, `absent`, `unreadable`,
+`malformed`, `incomplete`, `unsupported` each have at least one dedicated
+test). `ok` and `empty` remain the only two ever confirmed against a real
+sample (S6–S11, per the Findings above) — `absent`, `unreadable`,
+`malformed`, `incomplete`, and `unsupported` are implemented and correct
+against the contract as understood, but still lack real-sample
+confirmation, consistent with this file's Deviations entry deprioritizing
+that pursuit.
 
 **Open questions before Phase 2 can implement against this contract:**
 

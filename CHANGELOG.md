@@ -57,3 +57,24 @@ own "Plan history," and per-task deviations live in each task-plan file.
   default log output, and versioned YAML-frontmatter metadata handling.
   43 tests, `ruff` lint/format clean, verified reproducible from a
   from-scratch `.venv` rebuild. Documented dev setup in `AGENTS.md`.
+- Phase 3 (in progress): implemented `discovery.py` — read-only recordings
+  enumeration, the confirmed exclusion list, composition-sidecar ID
+  resolution for ID-less filenames, duplicate-ID detection, and
+  fingerprint-based new/unchanged/changed/unstable/inaccessible
+  classification. Extended `state.RecordingState` with source
+  fingerprint and first-seen fields. 17 new tests (60 total); read-only
+  guarantee verified directly. See
+  `tasks/015-file-discovery-and-source-metadata.md` for what's still open
+  (import-mode cutoffs, real delayed-download verification).
+- Phase 4 (complete): implemented `extraction.py` — a bounded ISO-BMFF/
+  QuickTime atom walker covering both confirmed transcript lookup paths
+  (`.m4a`'s direct `tsrp` box, `.qta`'s `mdta`-keyed `meta`/`keys`/`ilst`
+  chain), searching every track rather than assuming the first one. All
+  seven extraction statuses (`ok`/`empty`/`absent`/`unreadable`/
+  `malformed`/`incomplete`/`unsupported`) implemented and tested. Revised
+  three parts of Phase 1's draft extraction contract during
+  implementation (see `tasks/005-...md`). Added
+  `tests/mp4_builders.py`, a from-scratch synthetic container builder,
+  and 21 tests covering every status, Unicode fidelity, bounded failure
+  on a corrupted container, and runtime proof of no network/database
+  access. 81 tests total; `ruff` lint/format clean.
