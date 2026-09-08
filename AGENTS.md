@@ -57,6 +57,7 @@ than silently changing, discarding, or replacing source material.
 
 ## Repository hygiene
 
+- **Never run `git commit` without the user's explicit, in-the-moment approval of that specific commit.** Staging changes, drafting a commit message, and showing the user what would be committed is fine; running `git commit` itself is not, until the user says yes to that commit. A prior request to do related work (e.g. "continue the task," "document this finding") is not approval to commit — approval must be given for the commit itself, every time. This applies to every agent working in this repository, not just one session.
 - `tasks/` is committed project history. Keep task plans current and their checkboxes accurate.
 - Add a `CHANGELOG.md` entry (Keep a Changelog format, under `Unreleased` until there is a release) when a phase or other meaningful change completes. Keep entries short and factual — summarize outcomes rather than restating a task plan's own history or a task file's material-deviation notes.
 - `resources/` is a tracked folder for polished public planning material and other curated project resources. Do not place raw private notes there.
