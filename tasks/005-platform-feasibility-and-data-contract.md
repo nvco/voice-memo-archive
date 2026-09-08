@@ -26,19 +26,19 @@ what's done and what to do next._
   filename with no ID suffix (canonical ID lives in an adjacent
   `.composition/manifest.plist`'s `RCSavedRecordingUUID`), with a concrete
   Phase 3 follow-up recorded under "Open items for later phases."
+- Probed the transcript payload location and structural shape on 4 fresh
+  `.m4a`/`.qta` test samples (S6–S9, one per format/channel combination,
+  made specifically for this probing pass) plus a re-probe of S5 (the
+  ID-less recording). Confirmed both the `.m4a` direct-`tsrp`-atom path and
+  the `.qta` metadata-keyed path from real evidence. See Findings.
 
 **Not done yet — next action:**
 
-- **Transcript payload has not been probed on any sample.** No `tsrp` atom
-  or metadata-keyed transcript lookup has been run yet. This is the next
-  step: for each of the 5 samples already opened, determine where the
-  Apple-generated transcript actually lives and in what structural shape —
-  read-only, structural facts only, no transcript text retained (see
-  "Non-sensitive evidence to retain" below).
 - iCloud stability signals (repeat-read consistency across a delayed
   download) not yet tested.
-- No extraction-result contract or support matrix has been drafted —
-  both depend on the transcript-location finding above.
+- No extraction-result contract or support matrix has been drafted yet —
+  the transcript-location/shape finding needed for both is now in hand
+  (see Findings); drafting the contract itself is the next concrete step.
 - FDA behavior was only observed from a developer-shell host process (VS
   Code's integrated terminal), not a packaged/signed executable — that
   part of the roadmap item remains unverified until Phase 8 produces one.
@@ -128,13 +128,22 @@ acceptable.
 
 ## Scope and decisions to validate (from the roadmap)
 
-- [ ] Verify transcript location, payload encoding, text presence, available
+- [x] Verify transcript location, payload encoding, text presence, available
       time ranges, locale, and layout variation for `.m4a` and for `.qta`.
-      _Layout variation (mono/stereo/spatial track structure) is confirmed —
-      see Findings. Transcript location/encoding/text/timing/locale is not
-      yet probed; this is the next action._
-- [ ] Establish whether `.qta` uses a direct `tsrp` atom, a metadata-keyed
+      _All confirmed on real samples (S5–S9) — see Findings: location
+      (`tsrp` box for `.m4a`; metadata-keyed `mdta:com.apple.VoiceMemos.tsrp`
+      for `.qta`), encoding (UTF-8 JSON), text presence (non-empty
+      `runs`/`attributeTable` on every sample checked), timing
+      (word/phrase-level `[start, end]` seconds), locale
+      (`locale.identifier`, e.g. `en_US`), and layout variation
+      (mono/stereo/spatial, confirmed earlier). Not yet covered: an
+      empty/no-transcript sample, and a non-`en_US` locale — see "Open
+      items for later phases."_
+- [x] Establish whether `.qta` uses a direct `tsrp` atom, a metadata-keyed
       transcript value, or both, from real evidence rather than assumption.
+      _Confirmed: `.qta` uses the metadata-keyed path only (no direct
+      `tsrp` box exists in it); `.m4a` uses a direct `tsrp` box only. See
+      Findings._
 - [ ] Verify the default source path,
       `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`,
       and confirm actual Full Disk Access behavior for a packaged
@@ -188,6 +197,29 @@ outcome._
   `.composition/` directory. Outcome: succeeded.
 - 2026-09-08: `plutil -p manifest.plist` (read-only plist pretty-print, no
   modification) inside S5's `.composition/` directory. Outcome: succeeded.
+- 2026-09-08: custom read-only Python atom-header walker (recurses only into
+  known ISO-BMFF/QuickTime container box types; for the metadata `keys` box
+  it reads the key namespace+name strings, which are Apple's schema, not
+  user content; for `ilst`/`data` leaf boxes it reads only the box size and
+  4-byte type-indicator field, never the payload) run against 4 freshly
+  made test samples S6–S9 (one per format/channel combination: `.qta`
+  spatial, `.qta` spatial, `.m4a` stereo, `.m4a` mono) to locate the
+  transcript-bearing atom in each. Outcome: succeeded; found a `tsrp` box
+  under `moov/trak/udta` in both `.m4a` samples and a metadata-keyed entry
+  (`mdta` namespace, key name `com.apple.VoiceMemos.tsrp`) under the first
+  `trak`'s classic-QuickTime `meta/keys`+`ilst` in both `.qta` samples.
+- 2026-09-08: for each of S6–S9, read the located transcript box's payload
+  as bytes, confirmed it parses as JSON, and inspected only its *shape*
+  (`json.loads`, then a structural walk that reports key names, container
+  lengths, and value types/lengths — never string content, except a locale
+  code where the value itself matched a locale-pattern regex, which this
+  file's protocol allows recording). Outcome: succeeded on all 4; consistent
+  schema across formats (see Findings).
+- 2026-09-08: re-ran the same atom walk plus the JSON-shape probe against
+  S5 (the ID-less recording from the earlier session) to confirm it still
+  carries its own intact transcript despite the failed-append/empty
+  `RCDecomposedFragments` finding already on record. Outcome: succeeded —
+  `tsrp` present and well-formed, same schema as S8/S9.
 
 ## Findings
 
@@ -241,6 +273,73 @@ proceeds._
     and the canonical ID lives in that sidecar's `RCSavedRecordingUUID`
     field rather than in the filename.
 
+- **Transcript location differs by format, confirmed on S6–S9 (and S5 for
+  the `.m4a` case):**
+  - `.m4a`: a `tsrp` box is present directly under `moov/trak/udta` (the
+    audio track's `udta`, not the file-level `moov/udta` that holds
+    `©nam`/`©too`). Its payload is the transcript JSON directly — no
+    metadata-key indirection.
+  - `.qta`: no top-level or `udta`-level `tsrp` box exists. Instead, the
+    *first* `trak` (the stereo/AAC track) carries a classic-QuickTime-style
+    `meta` box — a full box under `moov/trak/udta` on `.m4a`, but here
+    directly under `trak` with **no** ISO version/flags header (the parser
+    must detect this per-box; assuming the ISO full-box header
+    unconditionally misparses the child list). That `meta` box's `keys`
+    table has exactly one entry: namespace `mdta`, key name
+    `com.apple.VoiceMemos.tsrp`. Its `ilst` has exactly one corresponding
+    item, whose `data` box holds the transcript JSON.
+  - Answers the open scope question directly: `.qta` uses the
+    metadata-keyed path, not a direct `tsrp` box; `.m4a` uses a direct
+    `tsrp` box, not metadata-keyed. Both names literally contain "tsrp"
+    (box name vs. metadata key suffix), which is a coincidence worth noting
+    for anyone keyword-grepping rather than parsing structurally.
+  - Confirmed on 2 independent `.qta` samples and 3 independent `.m4a`
+    samples (S6/S7 for `.qta`; S8/S9/S5 for `.m4a`). Not yet tested against
+    a `.qta` recording with zero transcribable speech (silence-only), which
+    would confirm the same location holds for an empty-transcript case.
+- **`data` box type-indicator anomaly**: the QuickTime metadata `data` box's
+  4-byte type-indicator field reads `0` (the "reserved/binary" type in
+  Apple's iTunes-style metadata type enum) on every sample observed, even
+  though the payload is UTF-8 JSON text — not `1` (the enum's own "UTF-8
+  string" type). A Phase 2 parser must not branch on the declared type
+  indicator when locating this specific key; it should identify the
+  transcript value by key name (`com.apple.VoiceMemos.tsrp`) and parse the
+  `data` box payload as JSON/UTF-8 regardless of the type-indicator value.
+- **Transcript JSON schema, consistent across all 5 samples probed this
+  session** (`.m4a` mono/stereo and `.qta` spatial alike):
+  - Top level: `{"locale": {...}, "attributedString": {...}}`.
+  - `locale.identifier` and `locale.preferences.locale`: an underscore-form
+    locale code (e.g. `en_US`, observed on all 5 samples — no other locale
+    available to test this session). `locale.preferences.langs`: an array
+    of hyphen-form locale codes (e.g. `en-US`). `locale.current` and
+    `locale.preferences.temp`: small integers, purpose not yet determined
+    (not investigated further — out of scope for the extraction contract,
+    which only needs the identifier).
+  - `attributedString.runs`: a flat array alternating [text-run string,
+    integer attribute-table index], i.e. length `2 × attributeTable`
+    length. Run-string lengths observed ranging from very short (single
+    words) to longer phrases; exact text not retained per this file's
+    protocol.
+  - `attributedString.attributeTable`: an array of records, each currently
+    observed to contain exactly one key, `timeRange`: a 2-element
+    `[start_seconds, end_seconds]` pair (mixed `int`/`float` JSON encoding
+    depending on whether the value is a whole number), monotonically
+    non-decreasing across the array and bounded by the recording's
+    duration on every sample checked. This gives word/phrase-level timing,
+    confirming native timing is available at that granularity (not just a
+    single whole-transcript time range).
+  - Run count scaled roughly with recording length across the 5 samples
+    (shortest ~8.7s recording had the smallest run/attribute counts,
+    longest ~12.5s recording the largest), consistent with per-word or
+    per-short-phrase segmentation rather than one run per sentence.
+- **S5 re-confirmed**: despite the empty `RCDecomposedFragments` finding
+  already on record (the user's own account this session: they attempted
+  Voice Memos' "add to existing recording" flow and the appended content
+  ended up empty, which is why no ID suffix was written to the filename),
+  the original recording's own `tsrp` transcript is intact, well-formed,
+  and matches the same JSON schema as the other `.m4a` samples. The failed
+  append did not corrupt or remove the existing transcript.
+
 ## Open items for later phases
 
 _Concrete follow-ups this investigation surfaced, to be picked up when the
@@ -265,6 +364,27 @@ relevant phase's task file is created — listed here so they are not lost._
   recordings (stereo + ambisonic dual-track), `.m4a` = mono or stereo
   single-track. Needs confirmation across more samples before it's stated
   as a rule rather than an observation.
+- **Phase 2 (extraction implementation)**: the transcript parser needs two
+  distinct lookup paths — a direct `moov/trak/udta/tsrp` box read for
+  `.m4a`, and a `moov/trak/meta` (no ISO version/flags — detect, don't
+  assume) → `keys` scan for namespace `mdta` / name
+  `com.apple.VoiceMemos.tsrp` → matching `ilst` item's `data` box for
+  `.qta`. Parse the `data` payload as UTF-8 JSON regardless of the
+  box's own type-indicator field (observed `0`, not the "UTF-8 string"
+  enum value — see Findings). Do not assume `.qta`'s metadata is on the
+  first `trak` for every recording without checking `tref`/`hdlr` — this
+  session confirmed it empirically on 2 samples but did not verify the
+  track-selection logic against a sample where track order might differ.
+- **Phase 1/2 (transcript JSON schema)**: draft the extraction result
+  contract's transcript shape around `locale.identifier`,
+  `attributedString.runs` (alternating text/attribute-index pairs), and
+  `attributedString.attributeTable[].timeRange` (`[start, end]` seconds,
+  word/phrase granularity) — see Findings for the full schema notes. Still
+  needed before the contract can be drafted: a sample with an empty/absent
+  transcript (silence-only recording) to confirm how absence is
+  represented (missing `tsrp`/key entirely vs. present-but-empty
+  `runs`/`attributeTable`), and a non-`en_US` locale sample to confirm the
+  locale field format holds.
 
 ## Deviations from the roadmap
 

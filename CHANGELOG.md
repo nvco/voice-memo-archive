@@ -33,5 +33,10 @@ own "Plan history," and per-task deviations live in each task-plan file.
   (stereo AAC + ambisonic); found that a recording's filename can omit its
   ID suffix when a `.composition/manifest.plist` sidecar exists, with the
   canonical ID recoverable from that sidecar instead. See the task file for
-  full findings and remaining open items (transcript-payload location is
-  still unprobed).
+  full findings and remaining open items.
+- Phase 1 (in progress): probed and confirmed the native transcript's
+  container location and JSON shape on real `.m4a` and `.qta` samples —
+  `.m4a` carries it in a direct `tsrp` box, `.qta` carries it via a
+  metadata-keyed entry, and both encode the same locale/timed-run JSON
+  schema. See the task file's Findings for the full structural detail and
+  the Phase 2 parsing implications it leaves open.
