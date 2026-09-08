@@ -31,14 +31,21 @@ what's done and what to do next._
   made specifically for this probing pass) plus a re-probe of S5 (the
   ID-less recording). Confirmed both the `.m4a` direct-`tsrp`-atom path and
   the `.qta` metadata-keyed path from real evidence. See Findings.
+- Probed two more fresh samples, S10 (`.qta`) and S11 (`.m4a`), both
+  recorded specifically as no-speech/silence test cases. Confirmed on both
+  formats: the transcript key is still written but `attributedString`
+  collapses to an empty string instead of the runs/attributeTable object —
+  the format-independent "no transcript" signal a parser must detect. See
+  Findings.
 
 **Not done yet — next action:**
 
+- A non-`en_US` locale sample is still untested (skipped this session).
 - iCloud stability signals (repeat-read consistency across a delayed
   download) not yet tested.
 - No extraction-result contract or support matrix has been drafted yet —
-  the transcript-location/shape finding needed for both is now in hand
-  (see Findings); drafting the contract itself is the next concrete step.
+  enough transcript-shape evidence is now in hand to draft a first version
+  of the contract (see Findings); that's the next concrete step.
 - FDA behavior was only observed from a developer-shell host process (VS
   Code's integrated terminal), not a packaged/signed executable — that
   part of the roadmap item remains unverified until Phase 8 produces one.
@@ -220,6 +227,16 @@ outcome._
   carries its own intact transcript despite the failed-append/empty
   `RCDecomposedFragments` finding already on record. Outcome: succeeded —
   `tsrp` present and well-formed, same schema as S8/S9.
+- 2026-09-08: same atom walk plus JSON-shape probe against S10, a fresh
+  `.qta` sample the user recorded specifically as a no-speech/silence test
+  case. Outcome: succeeded; the metadata-keyed `tsrp` entry is still
+  present (same `mdta`/`com.apple.VoiceMemos.tsrp` location as S6/S7), but
+  its JSON shape differs for the no-content case — see Findings.
+- 2026-09-08: same atom walk plus JSON-shape probe against S11, a fresh
+  `.m4a` sample the user recorded as the `.m4a` counterpart to the S10
+  no-speech test. Outcome: succeeded; direct `tsrp` box present at the
+  same location as S8/S9, showing the identical empty-string
+  `attributedString` collapse seen on S10 — see Findings.
 
 ## Findings
 
@@ -332,6 +349,31 @@ proceeds._
     (shortest ~8.7s recording had the smallest run/attribute counts,
     longest ~12.5s recording the largest), consistent with per-word or
     per-short-phrase segmentation rather than one run per sentence.
+- **Empty/no-speech case (S10, a `.qta` recorded specifically as a
+  silence/no-speech test)**: the transcript entry is *not absent* — the
+  `mdta`/`com.apple.VoiceMemos.tsrp` metadata key/value is still written,
+  in the same location as a normal `.qta` transcript. What differs is the
+  JSON shape: `attributedString` is a **string** (`""`, empty) rather than
+  the **object** (`{"runs": [...], "attributeTable": [...]}`) seen on
+  every non-empty sample. `locale` is still populated normally. This means
+  a parser cannot treat "key present" as "transcript present" — it must
+  check `attributedString`'s JSON type, and treat the empty-string case as
+  the "no transcript" classification the extraction contract needs (rather
+  than as a malformed/unexpected shape). Not yet tested: whether `.m4a`'s
+  direct `tsrp` box shows the same empty-string collapse, or whether the
+  `tsrp` entry can be absent entirely under some other condition (e.g. a
+  recording made before transcription finishes, or transcription
+  explicitly disabled) — both remain open.
+  - `locale.preferences.langs` on this sample had more than one entry
+    (only one was seen on S6–S9). Not pursued further this session since
+    it doesn't affect the schema question being tested here, but it's a
+    reminder that `langs` is a list and may vary in length per device.
+  - **Confirmed on `.m4a` too (S11)**: a same-day `.m4a` no-speech
+    counterpart to S10 shows the identical empty-string
+    `attributedString` collapse in its direct `tsrp` box (box size 143
+    bytes, vs. ~700+ bytes for a non-empty transcript on a similar-length
+    recording). The "no transcript" JSON shape is format-independent —
+    resolves the one gap left open earlier this session.
 - **S5 re-confirmed**: despite the empty `RCDecomposedFragments` finding
   already on record (the user's own account this session: they attempted
   Voice Memos' "add to existing recording" flow and the appended content
