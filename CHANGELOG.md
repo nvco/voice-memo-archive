@@ -40,3 +40,20 @@ own "Plan history," and per-task deviations live in each task-plan file.
   metadata-keyed entry, and both encode the same locale/timed-run JSON
   schema. See the task file's Findings for the full structural detail and
   the Phase 2 parsing implications it leaves open.
+- Phase 1: drafted a support matrix from accumulated findings, then closed
+  out remaining sample-dependent gaps (non-`en_US` locale, in-progress
+  iCloud download, absent/malformed/incomplete transcript cases) as
+  deliberately deprioritized rather than blocking further work — see the
+  task file's Deviations section.
+- Phase 2 (started): chose Python as the implementation language/toolchain
+  and created `tasks/010-foundation-and-test-harness.md`.
+- Phase 2 (complete): built the Python package skeleton
+  (`src/voice_memo_archive/`) with module boundaries for config, state,
+  discovery, extraction, archiving, scheduling, and diagnostics; a thin
+  CLI that only calls into them. Implemented versioned `config.json`/
+  `state.json` schemas with a tested generic migration chain, atomic
+  writes, a stale-lock-reclaiming scan lock, filename/path/date utilities,
+  a structured error taxonomy that keeps transcript-adjacent detail out of
+  default log output, and versioned YAML-frontmatter metadata handling.
+  43 tests, `ruff` lint/format clean, verified reproducible from a
+  from-scratch `.venv` rebuild. Documented dev setup in `AGENTS.md`.

@@ -40,6 +40,24 @@ than silently changing, discarding, or replacing source material.
 - Do not create archive files for empty or transcript-less recordings.
 - Provide a command-line interface and user-level `launchd` automation; do not add a separate graphical application.
 
+## Development setup
+
+The implementation is Python (chosen in `tasks/000-initial-build.md`'s Plan
+history). From a fresh checkout:
+
+```
+uv venv .venv
+uv pip install -e ".[dev]" --python .venv/bin/python
+```
+
+Then, offline and without any real Voice Memos data:
+
+```
+.venv/bin/python -m pytest -q   # tests
+.venv/bin/ruff check .          # lint
+.venv/bin/ruff format .         # format
+```
+
 ## Testing and verification
 
 - Add tests for every meaningful behavior change.

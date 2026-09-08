@@ -18,7 +18,7 @@ When an issue changes product intent, update the brief first. When it changes se
 
 0. [x] Repository baseline and privacy preflight
 1. [ ] Platform feasibility and data contract
-2. [ ] Foundation and test harness
+2. [x] Foundation and test harness
 3. [ ] File discovery and source metadata
 4. [ ] Native transcript extraction and fidelity
 5. [ ] Archive output, deduplication, and conflicts
@@ -101,9 +101,9 @@ Phase 1 has defined the extraction result contract.
 
 ### Exit criteria
 
-- [ ] A fresh checkout runs focused tests using only synthetic or redacted fixtures.
-- [ ] State, configuration, and output metadata schemas have explicit versions and tested migration/recovery behavior.
-- [ ] The scan lock and error taxonomy are testable independently of the CLI or `launchd`.
+- [x] A fresh checkout runs focused tests using only synthetic or redacted fixtures.
+- [x] State, configuration, and output metadata schemas have explicit versions and tested migration/recovery behavior.
+- [x] The scan lock and error taxonomy are testable independently of the CLI or `launchd`.
 
 ## Phase 3: File discovery and source metadata
 
@@ -288,5 +288,6 @@ All prior phases.
 ## Plan history
 
 - 2026-09-08: Clarified the read-only, command-line-only product boundary: no Voice Memos database access, transcription fallback, or graphical app. Added verified-layout investigation for local `.m4a`/`.qta` samples; `status`, retry, and acknowledgment behavior; and the default archive root, `~/Documents/Voice Memo Archive/`.
+- 2026-09-08: Chose Python as the implementation language/toolchain, ahead of Phase 2. Phase 8's "no developer runtime" install requirement means the eventual distribution must bundle its own interpreter (e.g. a frozen/py2app-style build) rather than relying on a system Python — record this as a Phase 8 constraint to revisit when packaging is scoped.
 - 2026-09-08: Added Phase 0 so the committed public baseline, local-only privacy boundary, and detailed Phase 1 task plan are mandatory prerequisites for implementation.
 - 2026-09-07: Consolidated initial technical scope from prematurely created future task files into this master roadmap. Detailed task files will be created only when their phase begins.
