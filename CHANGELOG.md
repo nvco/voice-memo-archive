@@ -78,3 +78,20 @@ own "Plan history," and per-task deviations live in each task-plan file.
   and 21 tests covering every status, Unicode fidelity, bounded failure
   on a corrupted container, and runtime proof of no network/database
   access. 81 tests total; `ruff` lint/format clean.
+- Phase 5 (complete): implemented `archive.py` — deterministic
+  `YYYY/MM/DD/HHMMSS-<recording_id>.md` archive output via
+  `yaml_meta.dump_metadata` and `io_utils.atomic_write`, conflict
+  detection for a changed source, a changed transcript, or a duplicate
+  memo ID (each raising a structured `ArchiveError` and leaving the
+  existing file untouched rather than overwriting), and archive
+  inspection/reconciliation (`inspect_archive`,
+  `rebuild_state_from_archive`) that classifies every file in the
+  archive tree and can rebuild per-recording operational state from
+  frontmatter alone. Extended `yaml_meta.REQUIRED_FIELDS` with
+  `source_filename`, `source_size`, `source_mtime`, and
+  `transcript_sha256` to close gaps against Phase 5's own requirements
+  that Phase 2's draft schema had missed. 20 new tests in
+  `tests/test_archive.py` (101 total); `ruff` lint/format clean. See
+  `tasks/025-archive-output-and-deduplication.md` for what's still open
+  (orchestration wiring is Phase 6's job; real-sample verification is
+  Phase 9's).

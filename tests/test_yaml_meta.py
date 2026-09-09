@@ -4,10 +4,14 @@ from voice_memo_archive.yaml_meta import dump_metadata, load_metadata
 
 VALID_FIELDS = {
     "recording_id": "sample transcript text ID",
+    "source_filename": "20240115 143022-sample transcript text ID.m4a",
     "source_format": "m4a",
+    "source_size": 123456,
+    "source_mtime": 1705329022.0,
     "recorded_at": "2024-01-15T14:30:22-08:00",
     "locale": "en_US",
     "extraction_format_version": 1,
+    "transcript_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85",
     "archived_at": "2024-01-15T20:00:00Z",
 }
 

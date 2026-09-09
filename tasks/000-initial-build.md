@@ -175,10 +175,10 @@ Phases 3 and 4.
 
 ### Exit criteria
 
-- [ ] Markdown output is self-describing, fact-only, and robust to YAML/Markdown boundary cases.
-- [ ] Interrupted writes cannot create a completed-looking partial archive.
-- [ ] Duplicate, changed, and missing source situations retain historical text and report an actionable conflict.
-- [ ] Archive metadata can rebuild successful operational state.
+- [x] Markdown output is self-describing, fact-only, and robust to YAML/Markdown boundary cases.
+- [x] Interrupted writes cannot create a completed-looking partial archive.
+- [x] Duplicate, changed, and missing source situations retain historical text and report an actionable conflict.
+- [x] Archive metadata can rebuild successful operational state.
 
 ## Phase 6: Operational state, retries, and recovery
 
