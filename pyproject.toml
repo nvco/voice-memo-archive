@@ -2,6 +2,7 @@
 name = "voice-memo-archive"
 version = "0.1.0"
 description = "Exports Apple Voice Memos' existing native transcripts into a durable, local Markdown archive."
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",

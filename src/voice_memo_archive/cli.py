@@ -228,6 +228,34 @@ def _cmd_setup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_uninstall(args: argparse.Namespace) -> int:
+    """Remove the background service. Never touches the archive tree.
+
+    Per `tasks/000-initial-build.md` Phase 8: "Uninstalling the service
+    must not delete the user's archive." This command has no code path
+    that reads `archive_root` at all, let alone writes to it — not a
+    redaction, a structural guarantee.
+    """
+    from . import launchd
+
+    launchd.bootout()  # safe/no-op if nothing was ever registered
+    plist_path = launchd.plist_path()
+    if plist_path.exists():
+        plist_path.unlink()
+        print(f"Removed {plist_path}")
+    else:
+        print("No launchd job was installed.")
+
+    if args.purge_config:
+        for path in (args.config, args.state):
+            if path.exists():
+                path.unlink()
+                print(f"Removed {path}")
+
+    print("Your archive was not touched and remains at its configured location.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     from . import config
 
@@ -319,6 +347,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="also register the scan job with launchd immediately",
     )
     setup_parser.set_defaults(func=_cmd_setup)
+
+    uninstall_parser = subparsers.add_parser(
+        "uninstall", help="remove the background service (never touches the archive)"
+    )
+    add_config_state_args(uninstall_parser)
+    uninstall_parser.add_argument(
+        "--purge-config",
+        action="store_true",
+        dest="purge_config",
+        help="also remove config.json/state.json (settings/bookkeeping only, never the archive)",
+    )
+    uninstall_parser.set_defaults(func=_cmd_uninstall)
 
     return parser
 

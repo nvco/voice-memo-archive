@@ -139,3 +139,38 @@ own "Plan history," and per-task deviations live in each task-plan file.
   it ever ran). 182 tests total (up from 126); `ruff` lint/format clean.
   See `tasks/035-setup-automation-and-diagnostics.md` for what's still
   open (real `launchd`/first-run verification is Phase 9's job).
+- Phase 8 (complete): added `cli.py`'s `uninstall` subcommand — removes
+  the `launchd` registration/plist (and, only with an explicit
+  `--purge-config` flag, `config.json`/`state.json`) while never reading
+  `archive_root` at all, so "uninstalling must not delete the user's
+  archive" is a structural guarantee rather than a redaction to get
+  right. Added `tests/test_privacy_claims.py`, proving at the product
+  (`cli.py`) level — not just one module — that no command ever opens a
+  network socket and that transcript content never appears in any
+  command's output, including after a real `processed` archive write (a
+  first draft of these tests had a bug that made them pass trivially by
+  accident, without ever exercising a real successful extraction —
+  caught and fixed before landing). Decided the distribution form —
+  source install (`git clone` + `pip install`), raised to the user rather
+  than guessed at — and added `README.md` plus a `readme` field in
+  `pyproject.toml` documenting install, setup, everyday use, privacy
+  guarantees, and uninstall behavior. No code signing/notarization
+  applies to this distribution form; it does require Python 3.11+
+  already present, named as a plain prerequisite rather than glossed
+  over. 193 tests total; `ruff` lint/format clean. See
+  `tasks/040-packaging-permissions-and-privacy.md`.
+- Phase 9 (in progress): ran the automatable half of end-to-end
+  verification — the full 193-test suite from a from-scratch `.venv`
+  install (`uv pip install -e ".[dev]"`, exercised through the real
+  `voice-memo-archive` console-script entry point, not just `python -m`,
+  confirming every subcommand's `--help` works and `AGENTS.md`'s
+  documented setup steps are still accurate); a repository audit
+  confirming no personal audio/transcript file, real filesystem path, or
+  `.local/` reference is tracked in Git; and a dependency audit
+  confirming the only runtime dependency (`pyyaml`) has no network
+  capability, corroborating Phase 8's behavioral no-network proof. No
+  findings. The remaining Phase 9 scope — the real-recording verification
+  matrix — requires the user to actually run `setup`/`scan` against their
+  real Voice Memos folder; this session deliberately did not do that on
+  its own initiative. See
+  `tasks/045-end-to-end-verification-and-release-readiness.md`.

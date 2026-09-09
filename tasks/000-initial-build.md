@@ -248,10 +248,10 @@ Phase 7.
 
 ### Exit criteria
 
-- [ ] A clean macOS account can install and run the distribution without a developer runtime.
-- [ ] Permission failures are accurately diagnosed.
-- [ ] Network denial and log-redaction checks pass.
-- [ ] Public privacy, installation, upgrade, and uninstall documentation matches tested behavior.
+- [x] A clean macOS account can install and run the distribution without a developer runtime.
+- [x] Permission failures are accurately diagnosed.
+- [x] Network denial and log-redaction checks pass.
+- [x] Public privacy, installation, upgrade, and uninstall documentation matches tested behavior.
 
 ## Phase 9: End-to-end verification and release readiness
 

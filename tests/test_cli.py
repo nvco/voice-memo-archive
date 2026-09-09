@@ -272,6 +272,66 @@ def test_setup_enable_now_with_yes_calls_bootstrap_not_real_launchctl(
     assert "Background automation enabled" in capsys.readouterr().out
 
 
+def test_uninstall_removes_the_plist_and_never_touches_the_archive(capsys, tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(launchd, "bootout", lambda: None)  # never invoke real launchctl
+    config_path = _write_synthetic_config(tmp_path)
+    from voice_memo_archive.config import load_config
+
+    archive_root = Path(load_config(config_path).archive_root)
+    write_archive_entry(archive_root, ARCHIVE_METADATA, "Hello world.")
+    plist_path = tmp_path / "Library/LaunchAgents" / f"{launchd.LABEL}.plist"
+    plist_path.parent.mkdir(parents=True)
+    plist_path.write_bytes(b"placeholder plist content")
+
+    exit_code = main(
+        ["uninstall", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
+    )
+
+    assert exit_code == 0
+    assert not plist_path.exists()
+    assert config_path.exists()  # not purged by default
+    # The archive is completely untouched — this is a structural
+    # guarantee (uninstall's code never reads archive_root at all), and
+    # this assertion proves the file really does still exist on disk.
+    entries = list(archive_root.rglob("*.md"))
+    assert len(entries) == 1
+    assert entries[0].read_text() != ""
+
+
+def test_uninstall_with_no_plist_installed_reports_that_cleanly(capsys, tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(launchd, "bootout", lambda: None)
+    config_path = _write_synthetic_config(tmp_path)
+    exit_code = main(
+        ["uninstall", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
+    )
+    assert exit_code == 0
+    assert "No launchd job was installed" in capsys.readouterr().out
+
+
+def test_uninstall_purge_config_removes_config_and_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(launchd, "bootout", lambda: None)
+    config_path = _write_synthetic_config(tmp_path)
+    state_path = tmp_path / "state.json"
+    save_state(state_path, State())
+
+    exit_code = main(
+        [
+            "uninstall",
+            "--config",
+            str(config_path),
+            "--state",
+            str(state_path),
+            "--purge-config",
+        ]
+    )
+    assert exit_code == 0
+    assert not config_path.exists()
+    assert not state_path.exists()
+
+
 def test_parser_requires_a_command():
     parser = build_parser()
     try:
