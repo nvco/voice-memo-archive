@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 SUPPORTED_EXTENSIONS = frozenset({"m4a", "qta"})
@@ -79,6 +79,19 @@ def attach_local_timezone(naive_dt: datetime) -> datetime:
     if naive_dt.tzinfo is not None:
         raise ValueError("expected a naive datetime")
     return naive_dt.astimezone()
+
+
+def format_utc_iso(dt: datetime) -> str:
+    """Render `dt` as a `Z`-suffixed UTC ISO 8601 string, seconds precision.
+
+    Accepts a naive datetime (assumed already UTC, e.g. from
+    `datetime.now(timezone.utc)`) or any aware datetime (converted to
+    UTC first). Used for every `state.RecordingState`/`State` timestamp
+    field, so they compare and sort as plain strings.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def redact_home_path(path: str | Path) -> str:

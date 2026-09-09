@@ -17,12 +17,20 @@ DEFAULT_STATE_PATH = Path.home() / "Library/Application Support/Voice Memo Archi
 
 def _cmd_scan(args: argparse.Namespace) -> int:
     from . import scheduling
+    from .errors import ArchiveError
 
     try:
-        scheduling.run_scan(args.config, args.state)
-    except NotImplementedError as exc:
-        print(f"not yet implemented: {exc}", file=sys.stderr)
+        summary = scheduling.run_scan(args.config, args.state)
+    except ArchiveError as exc:
+        print(str(exc), file=sys.stderr)
         return 1
+
+    counts = ", ".join(
+        f"{status}={count}" for status, count in sorted(summary.result_counts.items())
+    )
+    print(f"scan complete: {counts or 'nothing to do'}")
+    for entry in summary.unidentified:
+        print(f"unidentified ({entry.status}): {entry.path}", file=sys.stderr)
     return 0
 
 

@@ -32,15 +32,15 @@ import yaml
 from .errors import ArchiveError, ErrorCategory
 from .io_utils import atomic_write
 from .paths import archive_date_parts, redact_home_path
-from .state import RecordingState
+from .state import RecordingState, RecordingStatus
 from .yaml_meta import dump_metadata, load_metadata, validate_metadata
 
 _FRONTMATTER_DELIMITER = "---"
 
-# Phase 6 owns the full `RecordingState.status` vocabulary; this is the
-# value a rebuilt-from-archive entry gets, since a completed archive file
-# only ever exists for a successfully extracted, non-empty transcript.
-REBUILT_STATUS = "ok"
+# A completed archive file only ever exists for a successfully extracted,
+# non-empty transcript, so this is always the status a rebuilt-from-archive
+# entry gets.
+REBUILT_STATUS = RecordingStatus.PROCESSED
 
 
 def _archive_path(archive_root: Path, metadata: dict[str, Any]) -> Path:
@@ -209,6 +209,7 @@ def rebuild_state_from_archive(archive_root: Path) -> dict[str, RecordingState]:
     return {
         entry.metadata["recording_id"]: RecordingState(
             status=REBUILT_STATUS,
+            source_filename=entry.metadata["source_filename"],
             source_size=entry.metadata["source_size"],
             source_mtime=entry.metadata["source_mtime"],
         )

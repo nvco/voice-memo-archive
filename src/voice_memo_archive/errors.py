@@ -16,6 +16,17 @@ class ErrorCategory(StrEnum):
     # Source-recording access (Phase 3/4).
     SOURCE_UNREADABLE = "source_unreadable"
     SOURCE_UNSUPPORTED = "source_unsupported"
+    # Discovery-level conditions (Phase 3) with no dedicated category yet
+    # until Phase 6 needed to record one of them as a factual retry/report
+    # reason. SOURCE_MALFORMED_FILENAME/SOURCE_UNRESOLVABLE_ID are never
+    # actually stored in `state.RecordingState.last_error_category` (those
+    # candidates have no recording ID to key a state record on — see
+    # tasks/030-...md), but are defined here for a consistent taxonomy any
+    # future doctor/status reporting can reuse.
+    SOURCE_INACCESSIBLE = "source_inaccessible"
+    SOURCE_UNSTABLE = "source_unstable"
+    SOURCE_MALFORMED_FILENAME = "source_malformed_filename"
+    SOURCE_UNRESOLVABLE_ID = "source_unresolvable_id"
 
     # Native transcript extraction result, mirrors the Phase 1 contract's
     # `status` classifications (see tasks/005-...md "Draft extraction

@@ -10,6 +10,7 @@ from voice_memo_archive.archive import (
     write_archive_entry,
 )
 from voice_memo_archive.errors import ArchiveError, ErrorCategory
+from voice_memo_archive.state import RecordingStatus
 
 BASE_METADATA = {
     "recording_id": "ABCDEF12-3456-7890-ABCD-EF1234567890",
@@ -180,7 +181,8 @@ def test_rebuild_state_from_archive_reconstructs_fingerprint(tmp_path: Path):
     write_archive_entry(tmp_path, BASE_METADATA, "Hello world.")
     rebuilt = rebuild_state_from_archive(tmp_path)
     state = rebuilt[BASE_METADATA["recording_id"]]
-    assert state.status == "ok"
+    assert state.status == RecordingStatus.PROCESSED
+    assert state.source_filename == BASE_METADATA["source_filename"]
     assert state.source_size == BASE_METADATA["source_size"]
     assert state.source_mtime == BASE_METADATA["source_mtime"]
     assert state.first_seen_at is None

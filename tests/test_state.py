@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from voice_memo_archive.errors import StateError
-from voice_memo_archive.state import RecordingState, State, load_state, save_state
+from voice_memo_archive.state import RecordingState, RecordingStatus, State, load_state, save_state
 
 
 def test_load_state_missing_file_returns_empty_state(tmp_path: Path):
@@ -17,17 +17,41 @@ def test_save_then_load_round_trip_with_recordings(tmp_path: Path):
     path = tmp_path / "state.json"
     original = State(
         recordings={
-            "REC-1": RecordingState(status="archived", last_scanned_at="2024-01-15T14:30:22Z"),
+            "REC-1": RecordingState(
+                status=RecordingStatus.PROCESSED,
+                source_filename="20240115 143022-REC-1.m4a",
+                last_scanned_at="2024-01-15T14:30:22Z",
+            ),
             "REC-2": RecordingState(
-                status="failed", retry_count=2, last_error_category="transcript_malformed"
+                status=RecordingStatus.FAILED,
+                source_filename="20240115 150000-REC-2.m4a",
+                retry_count=2,
+                next_retry_at="2024-01-15T15:30:00Z",
+                last_error_category="transcript_malformed",
             ),
         },
         last_scan_started_at="2024-01-15T14:00:00Z",
         last_scan_completed_at="2024-01-15T14:05:00Z",
+        last_scan_result_counts={"processed": 1, "failed": 1},
+        last_scan_last_error="transcript_malformed",
     )
     save_state(path, original)
     loaded = load_state(path)
     assert loaded == original
+
+
+def test_load_state_rejects_unknown_status_value(tmp_path: Path):
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings": {"REC-1": {"status": "archived"}},
+            }
+        )
+    )
+    with pytest.raises(StateError):
+        load_state(path)
 
 
 def test_load_state_rejects_invalid_json(tmp_path: Path):

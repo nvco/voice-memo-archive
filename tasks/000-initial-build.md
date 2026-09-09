@@ -200,10 +200,10 @@ Phases 2, 3, and 5.
 
 ### Exit criteria
 
-- [ ] Normal scans do not parse stable successful recordings again.
-- [ ] A transient, empty, or failed source cannot disappear silently from status.
-- [ ] Retry spacing, exhaustion, acknowledgment, manual retry, and source-stability behavior have automated coverage.
-- [ ] State recovery and archive reconciliation preserve configuration and archival records.
+- [x] Normal scans do not parse stable successful recordings again.
+- [x] A transient, empty, or failed source cannot disappear silently from status.
+- [x] Retry spacing, exhaustion, acknowledgment, manual retry, and source-stability behavior have automated coverage.
+- [x] State recovery and archive reconciliation preserve configuration and archival records.
 
 ## Phase 7: Setup, automation, and diagnostics
 

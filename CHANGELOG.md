@@ -95,3 +95,24 @@ own "Plan history," and per-task deviations live in each task-plan file.
   `tasks/025-archive-output-and-deduplication.md` for what's still open
   (orchestration wiring is Phase 6's job; real-sample verification is
   Phase 9's).
+- Phase 6 (complete): implemented the scan orchestrator in
+  `scheduling.py` — `run_scan` drives `discovery.scan()`,
+  `extraction.extract_transcript()`, and `archive.write_archive_entry()`
+  under `io_utils.ScanLock`, mapping every outcome onto a new
+  `state.RecordingStatus` vocabulary (`pending`/`processed`/
+  `skipped_empty`/`skipped_no_transcript`/`failed`/`needs_attention`/
+  `acknowledged`/`conflict`, replacing Phase 2's unconstrained status
+  string). Stable successful recordings are never re-parsed; an empty
+  transcript requires two consecutive confirming scans before being
+  finalized `skipped_empty`; transient failures get three spaced,
+  increasing-delay retries before escalating to `needs_attention`; a
+  source-file change reopens processing immediately regardless of any
+  backoff in progress. Added targeted/bulk manual retry, acknowledgment,
+  and archive-based reconciliation (which `run_scan` also uses to
+  self-heal automatically from a corrupted `state.json`, never touching
+  `config.json`). Wired `cli.py`'s `scan` subcommand to the real
+  implementation. 16 new/changed tests, largely end-to-end scans against
+  synthetic containers with an injected fake clock (117 total); `ruff`
+  lint/format clean. See `tasks/030-operational-state-retries-and-recovery.md`
+  for what's still open (CLI surface for retry/acknowledge and `launchd`
+  automation are Phase 7's job).
