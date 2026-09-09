@@ -71,3 +71,111 @@ def test_save_config_is_atomic_no_leftover_temp_files(tmp_path: Path):
     save_config(path, Config())
     leftovers = [p for p in tmp_path.iterdir() if p != path]
     assert leftovers == []
+
+
+def test_load_config_without_phase7_fields_uses_defaults(tmp_path: Path):
+    # A config.json written before Phase 7 has none of these keys — must
+    # still load, with sensible defaults, no migration required.
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"schema_version": 1, "recordings_source": "/x", "archive_root": "/y"})
+    )
+    config = load_config(path)
+    assert config.import_mode == "all"
+    assert config.import_since is None
+    assert config.setup_completed_at is None
+    assert config.schedule_mode == "monitoring"
+    assert config.scan_interval_seconds == 900
+
+
+def test_save_then_load_round_trip_with_phase7_fields(tmp_path: Path):
+    path = tmp_path / "config.json"
+    original = Config(
+        import_mode="date",
+        import_since="2024-06-01",
+        setup_completed_at="2024-06-15T12:00:00Z",
+        schedule_mode="scheduled",
+        scan_interval_seconds=1800,
+    )
+    save_config(path, original)
+    assert load_config(path) == original
+
+
+def test_load_config_rejects_unknown_import_mode(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "import_mode": "sometimes",
+            }
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_load_config_rejects_unknown_schedule_mode(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "schedule_mode": "always",
+            }
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_load_config_rejects_non_positive_scan_interval(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "scan_interval_seconds": 0,
+            }
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_load_config_rejects_malformed_import_since(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "import_since": "not-a-date",
+            }
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_load_config_rejects_malformed_setup_completed_at(tmp_path: Path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "setup_completed_at": "not-a-timestamp",
+            }
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)

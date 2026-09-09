@@ -6,15 +6,16 @@ import mp4_builders as mp4
 
 from voice_memo_archive import archive, scheduling
 from voice_memo_archive.errors import ErrorCategory
+from voice_memo_archive.paths import format_utc_iso
 from voice_memo_archive.state import RecordingState, RecordingStatus, State, load_state
 
 RECORDING_ID = "AAAAAAAA-1111-2222-3333-444444444444"
 
 
-def _write_config(tmp_path: Path) -> tuple[Path, Path, Path]:
+def _write_config(tmp_path: Path, **extra) -> tuple[Path, Path, Path]:
     recordings_source = tmp_path / "recordings"
     archive_root = tmp_path / "archive"
-    recordings_source.mkdir()
+    recordings_source.mkdir(exist_ok=True)
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -22,6 +23,7 @@ def _write_config(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "schema_version": 1,
                 "recordings_source": str(recordings_source),
                 "archive_root": str(archive_root),
+                **extra,
             }
         )
     )
@@ -85,6 +87,36 @@ def test_unchanged_processed_recording_is_never_reextracted(tmp_path: Path, monk
     summary = scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 1, 15, 16, 0)))
 
     assert call_count == 0
+    assert summary.result_counts == {"processed": 1}
+
+
+def test_force_rescans_a_stable_processed_recording(tmp_path: Path, monkeypatch):
+    config_path, recordings_source, archive_root = _write_config(tmp_path)
+    _write_recording(
+        recordings_source,
+        f"20240115 143022-{RECORDING_ID}.m4a",
+        mp4.build_m4a_container(mp4.make_transcript_json()),
+    )
+    state_path = tmp_path / "state.json"
+    scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 1, 15, 15, 0)))
+
+    call_count = 0
+    from voice_memo_archive import extraction
+
+    original = extraction.extract_transcript
+
+    def spy(path):
+        nonlocal call_count
+        call_count += 1
+        return original(path)
+
+    monkeypatch.setattr(scheduling.extraction, "extract_transcript", spy)
+
+    summary = scheduling.run_scan(
+        config_path, state_path, now=_clock(datetime(2024, 1, 15, 16, 0)), force=True
+    )
+
+    assert call_count == 1
     assert summary.result_counts == {"processed": 1}
 
 
@@ -211,6 +243,92 @@ def test_source_change_reopens_needs_attention(tmp_path: Path):
     record = load_state(state_path).recordings[RECORDING_ID]
     assert record.status == RecordingStatus.PROCESSED
     assert record.retry_count == 0
+
+
+def test_import_mode_new_only_excludes_a_preexisting_recording(tmp_path: Path):
+    # Recorded 5 local calendar days before setup completes — unambiguous
+    # regardless of the test machine's timezone.
+    setup_completed_at = format_utc_iso(datetime(2024, 1, 16, 12, 0).astimezone())
+    config_path, recordings_source, _archive_root = _write_config(
+        tmp_path, import_mode="new_only", setup_completed_at=setup_completed_at
+    )
+    _write_recording(
+        recordings_source,
+        f"20240110 143022-{RECORDING_ID}.m4a",
+        mp4.build_m4a_container(mp4.make_transcript_json()),
+    )
+    state_path = tmp_path / "state.json"
+
+    summary = scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 1, 17, 9, 0)))
+
+    assert summary.result_counts == {}
+    assert load_state(state_path).recordings == {}
+
+
+def test_import_mode_new_only_includes_a_recording_from_the_cutoff_day(tmp_path: Path):
+    # Both anchored to local noon on the same local calendar day, so this
+    # is unambiguous regardless of the test machine's timezone —
+    # day-granularity means a recording made earlier that same day still
+    # counts as "new".
+    setup_completed_at = format_utc_iso(datetime(2024, 1, 16, 12, 0).astimezone())
+    config_path, recordings_source, _archive_root = _write_config(
+        tmp_path, import_mode="new_only", setup_completed_at=setup_completed_at
+    )
+    _write_recording(
+        recordings_source,
+        f"20240116 080000-{RECORDING_ID}.m4a",
+        mp4.build_m4a_container(mp4.make_transcript_json()),
+    )
+    state_path = tmp_path / "state.json"
+
+    summary = scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 1, 17, 9, 0)))
+
+    assert summary.result_counts == {"processed": 1}
+
+
+def test_import_mode_date_filters_by_recorded_at(tmp_path: Path):
+    config_path, recordings_source, _archive_root = _write_config(
+        tmp_path, import_mode="date", import_since="2024-06-01"
+    )
+    older_id = "OLDER-1111-2222-3333-444444444444"
+    newer_id = "NEWER-1111-2222-3333-444444444444"
+    _write_recording(
+        recordings_source,
+        f"20240501 090000-{older_id}.m4a",
+        mp4.build_m4a_container(mp4.make_transcript_json()),
+    )
+    _write_recording(
+        recordings_source,
+        f"20240601 090000-{newer_id}.m4a",
+        mp4.build_m4a_container(mp4.make_transcript_json()),
+    )
+    state_path = tmp_path / "state.json"
+
+    scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 6, 2, 9, 0)))
+
+    recordings = load_state(state_path).recordings
+    assert older_id not in recordings
+    assert recordings[newer_id].status == RecordingStatus.PROCESSED
+
+
+def test_import_cutoff_never_retroactively_excludes_an_already_tracked_recording(tmp_path: Path):
+    config_path, recordings_source, _archive_root = _write_config(tmp_path, import_mode="all")
+    _write_recording(
+        recordings_source,
+        f"20240115 143022-{RECORDING_ID}.m4a",
+        mp4.ftyp_box() + mp4.mdat_box(b"\x00" * 16),  # MALFORMED -> tracked as failed
+    )
+    state_path = tmp_path / "state.json"
+    scheduling.run_scan(config_path, state_path, now=_clock(datetime(2024, 1, 15, 15, 0)))
+    assert RECORDING_ID in load_state(state_path).recordings
+
+    # Switch to "date" mode with a cutoff well after this recording — it's
+    # already tracked, so it must keep being retried, not silently frozen.
+    config_path, _rs, _ar = _write_config(tmp_path, import_mode="date", import_since="2030-01-01")
+    scheduling.run_scan(
+        config_path, state_path, now=_clock(datetime(2024, 1, 15, 15, 6))
+    )  # past the first retry delay
+    assert load_state(state_path).recordings[RECORDING_ID].retry_count == 2
 
 
 def test_acknowledge_suppresses_but_preserves_facts():

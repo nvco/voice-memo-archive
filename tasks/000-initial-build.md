@@ -224,9 +224,9 @@ Phase 6.
 
 ### Exit criteria
 
-- [ ] Users see what initial import will consider before it begins.
-- [ ] Cancellation, restart, duplicate events, and login/restart behavior do not cause duplicate processing.
-- [ ] Status and doctor provide actionable, privacy-safe recovery guidance.
+- [x] Users see what initial import will consider before it begins.
+- [x] Cancellation, restart, duplicate events, and login/restart behavior do not cause duplicate processing.
+- [x] Status and doctor provide actionable, privacy-safe recovery guidance.
 
 ## Phase 8: Packaging, permissions, and privacy
 

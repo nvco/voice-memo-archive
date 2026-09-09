@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import archive, config, discovery, extraction
@@ -252,8 +252,30 @@ def _handle_candidate(
     archive_root: Path,
     now_dt: datetime,
     now_str: str,
+    force: bool = False,
 ) -> RecordingState | None:
-    """Return the new `RecordingState` for one candidate, or None to leave it untouched."""
+    """Return the new `RecordingState` for one candidate, or None to leave it untouched.
+
+    `force` is Phase 7's "full rescan": re-verify every candidate against
+    its source right now, bypassing both the stable-status skip and any
+    retry backoff still in progress. It does *not* re-extract a source that
+    genuinely hasn't changed into a different archive silently — if a
+    re-extraction under `force` produces something that no longer matches
+    the completed archive, `archive.write_archive_entry`'s existing
+    conflict detection still catches it as `conflict`, exactly as it would
+    for a real source change; `force` only decides whether the *attempt*
+    happens, never what happens once it does.
+    """
+    if candidate.status == discovery.CandidateStatus.UNCHANGED and prior is not None and force:
+        return _attempt_extraction_and_archive(
+            candidate,
+            prior,
+            base_attempt_count=0,
+            archive_root=archive_root,
+            now_dt=now_dt,
+            now_str=now_str,
+        )
+
     if candidate.status == discovery.CandidateStatus.UNCHANGED and prior is not None:
         if prior.status in _STABLE_UNCHANGED_STATUSES:
             return None
@@ -323,16 +345,54 @@ def _handle_candidate(
     )
 
 
+def import_cutoff_date(cfg: config.Config) -> date | None:
+    """The local calendar date before which a *newly discovered* candidate is skipped.
+
+    None means "all" — no filter. Day-granularity by design: "date" mode is
+    expressed to the user as a plain calendar date, and "new_only" uses the
+    local calendar day `setup` completed on, not a to-the-second cutoff —
+    a recording made a few hours before `setup` ran the same day still
+    counts as "new", which matches the roadmap's own framing ("created
+    after setup", day-level, not an artificially precise instant).
+    """
+    if cfg.import_mode == "date":
+        return date.fromisoformat(cfg.import_since) if cfg.import_since else None
+    if cfg.import_mode == "new_only":
+        if cfg.setup_completed_at is None:
+            return None
+        return datetime.fromisoformat(cfg.setup_completed_at).astimezone().date()
+    return None
+
+
+def passes_import_cutoff(candidate: discovery.Candidate, cutoff_date: date | None) -> bool:
+    """True if `candidate` should be considered at all under the import-mode cutoff.
+
+    Compares the recording's own `recorded_at` (a permanent historical
+    fact) against `cutoff_date` — never `first_seen_at`/discovery time, so
+    an old memo that merely finishes an iCloud download late is still
+    correctly excluded rather than mistaken for "new" (the exact case the
+    roadmap's Phase 3 scope calls out).
+    """
+    if cutoff_date is None:
+        return True
+    if candidate.recorded_at_iso is None:
+        return True
+    recorded_at = attach_local_timezone(datetime.fromisoformat(candidate.recorded_at_iso))
+    return recorded_at.date() >= cutoff_date
+
+
 def run_scan(
     config_path: Path,
     state_path: Path,
     *,
     now: Callable[[], datetime] | None = None,
+    force: bool = False,
 ) -> ScanSummary:
     """Run one scan: discover, extract, archive, and persist the outcome.
 
     `now` is an injectable clock (defaults to the real local time) so retry
-    spacing can be tested deterministically without sleeping.
+    spacing can be tested deterministically without sleeping. `force` is
+    Phase 7's "full rescan" — see `_handle_candidate`'s docstring.
     """
     clock = now or (lambda: datetime.now().astimezone())
     cfg = config.load_config(config_path)
@@ -350,6 +410,7 @@ def run_scan(
 
         started_at = format_utc_iso(clock())
         candidates = discovery.scan(recordings_source, current_state.recordings)
+        import_cutoff = import_cutoff_date(cfg)
 
         recordings = dict(current_state.recordings)
         unidentified: list[UnidentifiedEntry] = []
@@ -365,11 +426,22 @@ def run_scan(
                 )
                 continue
 
+            prior = recordings.get(candidate.recording_id)
+            if prior is None and not passes_import_cutoff(candidate, import_cutoff):
+                # Excluded by import_mode: quiet by design, not a problem
+                # to report — and never persisted, so a later import_mode
+                # change doesn't need to "un-exclude" anything.
+                continue
+
             now_dt = clock()
             now_str = format_utc_iso(now_dt)
-            prior = recordings.get(candidate.recording_id)
             new_record = _handle_candidate(
-                candidate, prior, archive_root=archive_root, now_dt=now_dt, now_str=now_str
+                candidate,
+                prior,
+                archive_root=archive_root,
+                now_dt=now_dt,
+                now_str=now_str,
+                force=force,
             )
             if new_record is None:
                 new_record = prior

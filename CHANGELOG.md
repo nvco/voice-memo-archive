@@ -116,3 +116,26 @@ own "Plan history," and per-task deviations live in each task-plan file.
   lint/format clean. See `tasks/030-operational-state-retries-and-recovery.md`
   for what's still open (CLI surface for retry/acknowledge and `launchd`
   automation are Phase 7's job).
+- Phase 7 (complete): added the setup flow (`setup.py`), user-level
+  `launchd` automation (`launchd.py`), extended diagnostics
+  (`diagnostics.run_doctor`), and the full CLI command surface
+  (`setup`, `scan` [now with `--force`], `status`, `doctor`, `retry`,
+  `acknowledge`, `reconcile`, `verify`). `config.json` gained
+  `import_mode`/`import_since`/`setup_completed_at`/`schedule_mode`/
+  `scan_interval_seconds`; a new import-mode cutoff filter in
+  `scheduling.py` supports all/new-only/date initial-import scoping,
+  filtering on each recording's own `recorded_at` rather than discovery
+  time so a delayed iCloud download is never mistaken for "new."
+  `launchd`'s plist is always written (idempotent, file-only) but only
+  ever registered with the running `launchd` behind an explicit
+  `--enable-now` and confirmation — never invoked for real against this
+  machine while building or testing this phase. Found and fixed two real
+  gaps along the way: a malformed `import_since`/`setup_completed_at` in
+  `config.json` now fails at load time instead of crashing a scan later,
+  and `doctor` no longer falls back to guessing the real default
+  recordings folder when `config.json` is corrupt (which would have
+  silently checked the wrong folder — and would have made the test suite
+  itself scan a real machine's actual Voice Memos folder, caught before
+  it ever ran). 182 tests total (up from 126); `ruff` lint/format clean.
+  See `tasks/035-setup-automation-and-diagnostics.md` for what's still
+  open (real `launchd`/first-run verification is Phase 9's job).
