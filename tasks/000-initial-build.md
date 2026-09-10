@@ -272,9 +272,9 @@ All prior phases.
 
 ### Exit criteria
 
-- [ ] At least one real synced `.m4a` and one real synced `.qta` complete the archive flow with their visible Apple transcript preserved.
-- [ ] Expected non-success states are visible and repairable.
-- [ ] No personal audio, transcript, title, identifier, or raw private note is tracked in Git.
+- [x] At least one real synced `.m4a` and one real synced `.qta` complete the archive flow with their visible Apple transcript preserved.
+- [x] Expected non-success states are visible and repairable.
+- [x] No personal audio, transcript, title, identifier, or raw private note is tracked in Git.
 - [ ] Release documentation and known limitations are ready for public review.
 
 ## Definition of done

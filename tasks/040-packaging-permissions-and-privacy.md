@@ -155,6 +155,17 @@ _Append one entry per work session: date, what was built/decided, outcome._
   smoke test to confirm the `pyproject.toml` change didn't break the
   build. Outcome: 193/193 tests pass; `ruff check`/`ruff format --check`
   clean.
+- 2026-09-10: Before starting real Phase 9 verification, the user asked
+  whether a full reset (uninstall + reinstall, nothing left behind) was
+  already possible. Confirmed: `uninstall --purge-config` already covers
+  automation + settings + bookkeeping; the archive tree is deliberately
+  never deleted by any command. Explicitly asked whether that should
+  change (e.g. a guarded `--wipe-everything` that also deletes the
+  archive) — **user confirmed keeping archive deletion manual/out of the
+  CLI entirely, on purpose, calling it "the scary part."** Record this as
+  a confirmed design decision, not an open question: do not add a
+  command that deletes the archive tree without this decision being
+  revisited with the user first.
 
 ## Deviations from the roadmap
 

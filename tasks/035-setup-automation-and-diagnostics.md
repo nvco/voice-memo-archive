@@ -6,7 +6,7 @@ goal or exit criteria beyond what is needed to execute the work.
 
 ## Status
 
-_Last updated: 2026-09-09. Read this section first in a new session to see
+_Last updated: 2026-09-10. Read this section first in a new session to see
 what's done and what to do next._
 
 **Done:**
@@ -121,6 +121,39 @@ what's done and what to do next._
 
 **Not done yet — next action:**
 
+- **Found during real Phase 9 usage (2026-09-10), not in review:** `setup`
+  is not actually the interactive prompt-driven wizard the roadmap's own
+  scope line describes ("an archive-destination *prompt*... all/date/
+  new-only initial import [as a choice put to the user]... monitoring or
+  scheduled mode, and supported scan intervals"). What's actually built:
+  every one of those values comes from a `--flag` (or silently falls back
+  to a hardcoded default if the flag is omitted) — the *only* real
+  interactive prompt is the final "Proceed? [y/N]" confirmation. The
+  first Scope checkbox below was checked off on "the capability exists
+  via flags," which is real but isn't what "prompt" meant. Reopened,
+  not silently left checked.
+  - **What to build:** when a value isn't supplied via its flag, `setup`
+    should prompt for it interactively (recordings source, archive
+    destination, import mode [+ date if applicable], schedule mode, scan
+    interval), showing a sensible default the user can accept by pressing
+    Enter — not require the flag to already be known. Flags remain as an
+    explicit override/non-interactive path (scripting, and this project's
+    own tests already depend on `--yes` + explicit flags to stay
+    deterministic) — this is additive, not a replacement.
+  - **Also requested:** re-running `setup` later to change one setting
+    must be easy — each prompt's shown default should be the *current*
+    `config.json` value when one already exists (not the package's
+    hardcoded `DEFAULT_*` constants), so accepting every default except
+    the one thing you want to change is the natural way to reconfigure.
+    `build_setup_plan`/`commit_setup`'s current signature (values in,
+    plan out, no awareness of an existing config) needs to grow a
+    "seed from existing config.json if present" step for this — probably
+    in `cli.py`'s `_cmd_setup` (the interactive layer), not `setup.py`
+    itself (which should stay side-effect-free per its own docstring).
+  - Explicitly deferred, not built, in this same session (2026-09-10):
+    the user asked for this to be tracked rather than built immediately,
+    so real Phase 9 verification could proceed using the existing
+    flag-driven `setup` in the meantime.
 - None of this has been exercised against a real `launchd` install, a
   real first-run `setup` on this machine, or real Voice Memos recordings
   — only synthetic fixtures and mocked `subprocess`/`Path.home()` calls.
@@ -145,16 +178,21 @@ what's done and what to do next._
 
 ## Scope and decisions to validate
 
-- [x] Offer command-line source selection and an archive-destination
+- [ ] Offer command-line source selection and an archive-destination
       prompt defaulting to `~/Documents/Voice Memo Archive/`, all/date/
       new-only initial import, a candidate-count preview, cancellation/
       resume, monitoring or scheduled mode, and supported scan intervals.
       Setup must disclose that a Documents destination may be iCloud
       Drive-synced according to the user's macOS settings. _`setup.py` +
-      `cli.py`'s `setup` subcommand. "Resume" specifically: re-running
-      `setup` is idempotent (tested) rather than needing a distinct resume
-      path — there's no partial/interrupted setup state to resume from,
-      since `commit_setup` is a single atomic `config.json` write._
+      `cli.py`'s `setup` subcommand implement all of this via `--flag`s
+      plus a preview and a final y/N confirmation — genuinely, not
+      partially. What's still missing, found during real use (2026-09-10):
+      the "prompt" itself — asking interactively for source/destination/
+      import-mode/schedule/interval when a flag isn't given, rather than
+      silently defaulting. Reopened from a premature check — see "Not
+      done yet" above for the concrete plan. "Resume" specifically is
+      still accurate as originally written: re-running `setup` is
+      idempotent (tested) rather than needing a distinct resume path._
 - [x] Define idempotent user-level `launchd` installation. Treat periodic
       scan as the reliable fallback to folder events; coalesce repeated
       triggers and prevent overlap. _`launchd.py`; overlap prevention is
@@ -217,6 +255,16 @@ _Append one entry per work session: date, what was built/decided, outcome._
   Caught two test-safety near-misses (real recordings-folder scans,
   real `~/Library/LaunchAgents` writes) before they ever ran. Outcome:
   182/182 tests pass; `ruff check`/`ruff format --check` clean.
+- 2026-09-10: Started real Phase 9 verification (`voice-memo-archive
+  doctor` against this machine's real Voice Memos folder — Full Disk
+  Access already worked, no `config.json` existed yet). Before running
+  `setup` for real, the user pushed back on the flag-only UX and asked
+  for a genuine interactive wizard, editable later by re-running `setup`
+  with the current config as each prompt's default. Recorded as a gap
+  above (reopened the first Scope checkbox rather than leaving it
+  checked) and explicitly deferred, on the user's own direction, so
+  real-environment testing could continue with the existing flag-driven
+  `setup` in the meantime. No code changed this entry.
 
 ## Deviations from the roadmap
 
