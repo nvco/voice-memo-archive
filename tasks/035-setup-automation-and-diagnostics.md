@@ -119,41 +119,57 @@ what's done and what to do next._
   fallback described above (fixing the design flaw fixed the test hazard
   at the same time, not just worked around it).
 
+- **Closed the interactive-wizard gap found during real Phase 9 usage
+  (2026-09-10):** `setup` now genuinely prompts — in `cli.py`'s
+  `_cmd_setup`, not `setup.py` (which stays side-effect-free per its own
+  docstring) — for recordings source, archive destination, import mode
+  (+ date if `date`), schedule mode, and scan interval, whenever the
+  corresponding `--flag` is omitted. Each prompt shows a default the user
+  can accept with Enter, and an invalid choice/date re-prompts rather than
+  failing. `--yes` means fully non-interactive (per this session's design
+  call, since a scripted/CI `setup --yes` must never block on stdin): it
+  skips *all* prompting, field-level and the final confirmation alike, and
+  fills anything not given via flag from the same source prompts would
+  have defaulted to.
+  - **"Seed from existing config" implemented:** `_cmd_setup` calls
+    `config.load_config(args.config)` first (already returns `Config()`
+    package defaults when no file exists yet, for free) and uses that as
+    every prompt's/every `--yes`-path fallback's default — never the
+    package's hardcoded `DEFAULT_*` constants directly. Verified live:
+    re-running `setup` and accepting every prompt's default except
+    `scan_interval_seconds` (a real answer) changed only that field and
+    left the rest (including a non-default `schedule_mode` from the prior
+    run) untouched. A corrupt existing `config.json` doesn't block
+    re-running setup — it's reported as a warning to stderr and treated
+    like no config existed, since the user is about to interactively
+    confirm every value anyway.
+  - Argparse's `--import-mode`/`--schedule-mode`/`--scan-interval` lost
+    their `default=config.DEFAULT_*` (now bare `None`) so an omitted flag
+    is distinguishable from an explicit choice; `choices=` still validates
+    a value actually given.
+  - Tests: `test_setup_declined_without_yes_writes_nothing` now supplies
+    every value flag explicitly (it was relying on defaults for
+    archive-root/import-mode/schedule-mode/scan-interval, which would
+    otherwise now hit new prompts an "always answer n" mocked `input`
+    can't safely satisfy — an unvalidated `"n"` for `import_mode` would
+    have looped forever asking to re-enter a valid choice; caught this by
+    actually running the suite, not just reasoning about it). Three new
+    tests added: defaults shown with no existing config are the package
+    defaults; an invalid choice/date re-prompts before succeeding; a
+    second `setup` run seeds every prompt's default from the first run's
+    committed `config.json`. 196 tests total (up from 193), `ruff
+    check`/`ruff format --check` clean.
+  - Manually smoke-tested end-to-end under a fake `HOME` (never the real
+    one) for both the fresh-install and reconfigure-one-setting flows;
+    caught and immediately cleaned up one real side effect during ad hoc
+    testing before switching to the fake-`HOME` approach — an early manual
+    check (before adding the `HOME` override) wrote a real, unregistered
+    plist to this machine's actual `~/Library/LaunchAgents/`. It was never
+    loaded into `launchd` (confirmed via `launchctl list`) and was deleted
+    immediately.
+
 **Not done yet — next action:**
 
-- **Found during real Phase 9 usage (2026-09-10), not in review:** `setup`
-  is not actually the interactive prompt-driven wizard the roadmap's own
-  scope line describes ("an archive-destination *prompt*... all/date/
-  new-only initial import [as a choice put to the user]... monitoring or
-  scheduled mode, and supported scan intervals"). What's actually built:
-  every one of those values comes from a `--flag` (or silently falls back
-  to a hardcoded default if the flag is omitted) — the *only* real
-  interactive prompt is the final "Proceed? [y/N]" confirmation. The
-  first Scope checkbox below was checked off on "the capability exists
-  via flags," which is real but isn't what "prompt" meant. Reopened,
-  not silently left checked.
-  - **What to build:** when a value isn't supplied via its flag, `setup`
-    should prompt for it interactively (recordings source, archive
-    destination, import mode [+ date if applicable], schedule mode, scan
-    interval), showing a sensible default the user can accept by pressing
-    Enter — not require the flag to already be known. Flags remain as an
-    explicit override/non-interactive path (scripting, and this project's
-    own tests already depend on `--yes` + explicit flags to stay
-    deterministic) — this is additive, not a replacement.
-  - **Also requested:** re-running `setup` later to change one setting
-    must be easy — each prompt's shown default should be the *current*
-    `config.json` value when one already exists (not the package's
-    hardcoded `DEFAULT_*` constants), so accepting every default except
-    the one thing you want to change is the natural way to reconfigure.
-    `build_setup_plan`/`commit_setup`'s current signature (values in,
-    plan out, no awareness of an existing config) needs to grow a
-    "seed from existing config.json if present" step for this — probably
-    in `cli.py`'s `_cmd_setup` (the interactive layer), not `setup.py`
-    itself (which should stay side-effect-free per its own docstring).
-  - Explicitly deferred, not built, in this same session (2026-09-10):
-    the user asked for this to be tracked rather than built immediately,
-    so real Phase 9 verification could proceed using the existing
-    flag-driven `setup` in the meantime.
 - None of this has been exercised against a real `launchd` install, a
   real first-run `setup` on this machine, or real Voice Memos recordings
   — only synthetic fixtures and mocked `subprocess`/`Path.home()` calls.
@@ -178,21 +194,20 @@ what's done and what to do next._
 
 ## Scope and decisions to validate
 
-- [ ] Offer command-line source selection and an archive-destination
+- [x] Offer command-line source selection and an archive-destination
       prompt defaulting to `~/Documents/Voice Memo Archive/`, all/date/
       new-only initial import, a candidate-count preview, cancellation/
       resume, monitoring or scheduled mode, and supported scan intervals.
       Setup must disclose that a Documents destination may be iCloud
       Drive-synced according to the user's macOS settings. _`setup.py` +
-      `cli.py`'s `setup` subcommand implement all of this via `--flag`s
-      plus a preview and a final y/N confirmation — genuinely, not
-      partially. What's still missing, found during real use (2026-09-10):
-      the "prompt" itself — asking interactively for source/destination/
-      import-mode/schedule/interval when a flag isn't given, rather than
-      silently defaulting. Reopened from a premature check — see "Not
-      done yet" above for the concrete plan. "Resume" specifically is
-      still accurate as originally written: re-running `setup` is
-      idempotent (tested) rather than needing a distinct resume path._
+      `cli.py`'s `setup` subcommand implement all of this: real
+      interactive prompts (as of 2026-09-10) for any value not given via
+      `--flag`, each defaulting to the current `config.json`'s value (or
+      the package default with no config yet), plus the candidate-count
+      preview and a final y/N confirmation. `--flag`s remain a full
+      non-interactive override path via `--yes`. "Resume" is idempotent
+      re-running of `setup` (tested), not a distinct resume path — as
+      originally written._
 - [x] Define idempotent user-level `launchd` installation. Treat periodic
       scan as the reliable fallback to folder events; coalesce repeated
       triggers and prevent overlap. _`launchd.py`; overlap prevention is
@@ -265,6 +280,18 @@ _Append one entry per work session: date, what was built/decided, outcome._
   checked) and explicitly deferred, on the user's own direction, so
   real-environment testing could continue with the existing flag-driven
   `setup` in the meantime. No code changed this entry.
+- 2026-09-10 (same day, continued): Built the deferred interactive wizard.
+  `_cmd_setup` now prompts for any value not given via flag, seeded from
+  the current `config.json` (or package defaults with none yet); `--yes`
+  skips all prompting including the final confirmation, for scripted use.
+  Updated one existing test that relied on unflagged defaults (would have
+  hung on the new prompts under its "always answer n" mocked `input`) and
+  added three new tests for the prompt/reprompt/reconfigure-seeding
+  behavior. Manually verified live under a fake `HOME`; also caught and
+  cleaned up a real (never-loaded) `~/Library/LaunchAgents` plist written
+  by one early manual check before switching to the fake-`HOME` approach.
+  Outcome: 196/196 tests pass; `ruff check`/`ruff format --check` clean;
+  first Scope checkbox re-closed.
 
 ## Deviations from the roadmap
 
@@ -279,3 +306,12 @@ here, per `AGENTS.md`'s working method._
   deliberate, more cautious interpretation — see `cli.py`'s module
   docstring and this file's earlier discussion — not a rejection of the
   feature; the capability is fully implemented and one flag away.
+- 2026-09-10: `--yes` was implemented to mean "fully non-interactive,"
+  skipping every field-level prompt as well as the final confirmation
+  (falling back to the current config's value for anything not flagged),
+  rather than only skipping the confirmation and still prompting for any
+  missing field. The roadmap doesn't specify this distinction; treating
+  `--yes` as "no stdin interaction at all" was judged necessary for
+  scripted/CI use of `setup --yes` to stay non-blocking, and matches how
+  this project's own tests already used `--yes` together with explicit
+  flags for determinism before this session.

@@ -165,17 +165,121 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return 0 if not inspection.malformed and not inspection.orphaned else 1
 
 
+def _prompt_text(label: str, default: str) -> str:
+    answer = input(f"{label} [{default}]: ").strip()
+    return answer or default
+
+
+def _prompt_choice(label: str, default: str, choices: list[str]) -> str:
+    options = "/".join(choices)
+    while True:
+        answer = input(f"{label} ({options}) [{default}]: ").strip()
+        if not answer:
+            return default
+        if answer in choices:
+            return answer
+        print(f"Please enter one of: {options}")
+
+
+def _prompt_date(label: str, default: str | None) -> str:
+    from datetime import date
+
+    default_suffix = f" [{default}]" if default else ""
+    while True:
+        answer = input(f"{label} (YYYY-MM-DD){default_suffix}: ").strip()
+        candidate = answer or default
+        if not candidate:
+            print("A date is required when import mode is 'date'.")
+            continue
+        try:
+            date.fromisoformat(candidate)
+        except ValueError:
+            print("Please enter a date as YYYY-MM-DD.")
+            continue
+        return candidate
+
+
+def _prompt_int(label: str, default: int, suggestions: tuple[int, ...]) -> int:
+    options = "/".join(str(s) for s in suggestions)
+    while True:
+        answer = input(f"{label} ({options}) [{default}]: ").strip()
+        if not answer:
+            return default
+        try:
+            return int(answer)
+        except ValueError:
+            print("Please enter a whole number of seconds.")
+
+
 def _cmd_setup(args: argparse.Namespace) -> int:
-    from . import launchd, setup
+    from . import config, launchd, setup
+    from .errors import ConfigError
+
+    try:
+        existing = config.load_config(args.config)
+    except ConfigError as exc:
+        print(
+            f"Warning: existing config.json could not be read ({exc}); using defaults.",
+            file=sys.stderr,
+        )
+        existing = config.Config()
+
+    recordings_source = str(args.recordings_source) if args.recordings_source else None
+    archive_root = str(args.archive_root) if args.archive_root else None
+    import_mode = args.import_mode
+    import_since = args.import_since
+    schedule_mode = args.schedule_mode
+    scan_interval = args.scan_interval
+    existing_import_since = existing.import_since if existing.import_mode == "date" else None
+
+    if args.yes:
+        # Non-interactive: an omitted flag falls back to the current
+        # config value (or the package default when no config exists yet
+        # — `load_config` already returns `Config()` in that case), never
+        # to a silent prompt. This is what makes `setup --yes
+        # --scan-interval 300` a safe way to change one setting without
+        # restating every other one.
+        recordings_source = recordings_source or existing.recordings_source
+        archive_root = archive_root or existing.archive_root
+        import_mode = import_mode or existing.import_mode
+        if import_since is None and import_mode == "date":
+            import_since = existing_import_since
+        schedule_mode = schedule_mode or existing.schedule_mode
+        if scan_interval is None:
+            scan_interval = existing.scan_interval_seconds
+    else:
+        # Interactive: prompt for anything not given via flag, showing the
+        # current config's value (or the package default) as the default
+        # the user accepts by pressing Enter. See tasks/035-...md.
+        if recordings_source is None:
+            recordings_source = _prompt_text("Recordings source", existing.recordings_source)
+        if archive_root is None:
+            archive_root = _prompt_text("Archive destination", existing.archive_root)
+        if import_mode is None:
+            import_mode = _prompt_choice(
+                "Import mode", existing.import_mode, sorted(config.IMPORT_MODES)
+            )
+        if import_mode == "date" and import_since is None:
+            import_since = _prompt_date("Import since date", existing_import_since)
+        if schedule_mode is None:
+            schedule_mode = _prompt_choice(
+                "Schedule mode", existing.schedule_mode, sorted(config.SCHEDULE_MODES)
+            )
+        if scan_interval is None:
+            scan_interval = _prompt_int(
+                "Scan interval seconds",
+                existing.scan_interval_seconds,
+                config.SUPPORTED_SCAN_INTERVALS_SECONDS,
+            )
 
     try:
         plan = setup.build_setup_plan(
-            recordings_source=str(args.recordings_source) if args.recordings_source else None,
-            archive_root=str(args.archive_root) if args.archive_root else None,
-            import_mode=args.import_mode,
-            import_since=args.import_since,
-            schedule_mode=args.schedule_mode,
-            scan_interval_seconds=args.scan_interval,
+            recordings_source=recordings_source,
+            archive_root=archive_root,
+            import_mode=import_mode,
+            import_since=import_since,
+            schedule_mode=schedule_mode,
+            scan_interval_seconds=scan_interval,
         )
     except ValueError as exc:
         print(f"invalid setup options: {exc}", file=sys.stderr)
@@ -315,26 +419,31 @@ def build_parser() -> argparse.ArgumentParser:
         "setup", help="configure source, destination, and schedule"
     )
     add_config_state_args(setup_parser)
+    # No `default=` on any of these (beyond argparse's implicit None): an
+    # omitted flag must be distinguishable from an explicitly-chosen value,
+    # so `_cmd_setup` can prompt for it interactively instead of silently
+    # substituting a hardcoded default. `choices` still validates a value
+    # given explicitly; it does not apply to the None default itself.
     setup_parser.add_argument("--recordings-source", type=Path, dest="recordings_source")
     setup_parser.add_argument("--archive-root", type=Path, dest="archive_root")
     setup_parser.add_argument(
         "--import-mode",
         choices=sorted(config.IMPORT_MODES),
-        default=config.DEFAULT_IMPORT_MODE,
+        default=None,
         dest="import_mode",
     )
     setup_parser.add_argument("--import-since", dest="import_since")
     setup_parser.add_argument(
         "--schedule-mode",
         choices=sorted(config.SCHEDULE_MODES),
-        default=config.DEFAULT_SCHEDULE_MODE,
+        default=None,
         dest="schedule_mode",
     )
     setup_parser.add_argument(
         "--scan-interval",
         type=int,
         choices=list(config.SUPPORTED_SCAN_INTERVALS_SECONDS),
-        default=config.DEFAULT_SCAN_INTERVAL_SECONDS,
+        default=None,
         dest="scan_interval",
     )
     setup_parser.add_argument(

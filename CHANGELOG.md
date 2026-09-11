@@ -187,3 +187,12 @@ own "Plan history," and per-task deviations live in each task-plan file.
   sample AI-summary skill over the archive (see
   `tasks/future-ai-summary-skill.md`, deliberately unnumbered). See
   `tasks/045-end-to-end-verification-and-release-readiness.md`.
+- Closed the Phase 7 setup-wizard gap: `setup` now prompts interactively
+  for any value not given via `--flag` (recordings source, archive
+  destination, import mode/date, schedule mode, scan interval), defaulting
+  each prompt to the current `config.json`'s value when one exists (else
+  the package default), so re-running `setup` and accepting every default
+  except the one setting you want to change is now the natural way to
+  reconfigure. `--yes` remains fully non-interactive for scripted use.
+  196 tests total; `ruff` lint/format clean. See
+  `tasks/035-setup-automation-and-diagnostics.md`.

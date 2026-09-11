@@ -222,8 +222,136 @@ def test_setup_with_yes_writes_config_and_plist_without_enabling(capsys, tmp_pat
     assert "Initial import will consider 0 recording(s)." in out
 
 
+def test_setup_interactive_prompts_use_package_defaults_when_no_existing_config(
+    capsys, tmp_path, monkeypatch
+):
+    # Import mode, schedule mode, and scan interval are left off entirely so
+    # the wizard must prompt for them; pressing Enter (empty answer) on each
+    # should accept the shown default. recordings-source/archive-root are
+    # still given explicitly per this file's own convention of never
+    # touching cli.py's real Application-Support/Voice-Memos defaults.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    responses = iter(["", "", "", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+    config_path = tmp_path / "config.json"
+    recordings_source = tmp_path / "recordings"
+    recordings_source.mkdir()
+
+    exit_code = main(
+        [
+            "setup",
+            "--config",
+            str(config_path),
+            "--state",
+            str(tmp_path / "state.json"),
+            "--recordings-source",
+            str(recordings_source),
+            "--archive-root",
+            str(tmp_path / "archive"),
+        ]
+    )
+    assert exit_code == 0
+    written = json.loads(config_path.read_text())
+    assert written["import_mode"] == "all"
+    assert written["schedule_mode"] == "monitoring"
+    assert written["scan_interval_seconds"] == 900
+
+
+def test_setup_interactive_reprompts_on_invalid_choice_then_accepts_a_valid_one(
+    capsys, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # import_mode: invalid, then "date"; import_since: a valid date;
+    # schedule_mode/scan_interval: accept defaults; confirm: yes.
+    responses = iter(["bogus", "date", "2026-01-01", "", "", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+    config_path = tmp_path / "config.json"
+    recordings_source = tmp_path / "recordings"
+    recordings_source.mkdir()
+
+    exit_code = main(
+        [
+            "setup",
+            "--config",
+            str(config_path),
+            "--state",
+            str(tmp_path / "state.json"),
+            "--recordings-source",
+            str(recordings_source),
+            "--archive-root",
+            str(tmp_path / "archive"),
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Please enter one of" in out
+    written = json.loads(config_path.read_text())
+    assert written["import_mode"] == "date"
+    assert written["import_since"] == "2026-01-01"
+
+
+def test_setup_interactive_prompts_seed_defaults_from_existing_config(
+    capsys, tmp_path, monkeypatch
+):
+    # Re-running setup to change one setting should mean "accept every
+    # prompt's default except the one you want to change" — each default
+    # must come from the *current* config.json, not the package's
+    # hardcoded defaults. Per tasks/035-...md's "Also requested" note.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    config_path = tmp_path / "config.json"
+    state_path = tmp_path / "state.json"
+    recordings_source = tmp_path / "recordings"
+    recordings_source.mkdir()
+    archive_root = tmp_path / "archive"
+
+    first_run = main(
+        [
+            "setup",
+            "--config",
+            str(config_path),
+            "--state",
+            str(state_path),
+            "--recordings-source",
+            str(recordings_source),
+            "--archive-root",
+            str(archive_root),
+            "--schedule-mode",
+            "scheduled",
+            "--yes",
+        ]
+    )
+    assert first_run == 0
+    capsys.readouterr()
+
+    # Second run: only scan-interval is given explicitly; everything else
+    # must be prompted for, defaulting to what's already in config.json.
+    responses = iter(["", "", "", "y"])  # archive_root, import_mode, schedule_mode, confirm
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+    second_run = main(
+        [
+            "setup",
+            "--config",
+            str(config_path),
+            "--state",
+            str(state_path),
+            "--recordings-source",
+            str(recordings_source),
+            "--scan-interval",
+            "1800",
+        ]
+    )
+    assert second_run == 0
+    written = json.loads(config_path.read_text())
+    assert written["archive_root"] == str(archive_root)
+    assert written["schedule_mode"] == "scheduled"  # preserved, not reset to "monitoring"
+    assert written["scan_interval_seconds"] == 1800
+
+
 def test_setup_declined_without_yes_writes_nothing(capsys, tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Every value-selecting flag is given explicitly so the only interactive
+    # prompt reached is the final "Proceed?" confirmation this test targets
+    # — "n" answers whichever single prompt is actually asked.
     monkeypatch.setattr("builtins.input", lambda prompt="": "n")
     config_path = tmp_path / "config.json"
     recordings_source = tmp_path / "recordings"
@@ -238,6 +366,14 @@ def test_setup_declined_without_yes_writes_nothing(capsys, tmp_path, monkeypatch
             str(tmp_path / "state.json"),
             "--recordings-source",
             str(recordings_source),
+            "--archive-root",
+            str(tmp_path / "archive"),
+            "--import-mode",
+            "all",
+            "--schedule-mode",
+            "monitoring",
+            "--scan-interval",
+            "900",
         ]
     )
     assert exit_code == 0
