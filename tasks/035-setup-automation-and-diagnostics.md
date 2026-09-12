@@ -6,8 +6,23 @@ goal or exit criteria beyond what is needed to execute the work.
 
 ## Status
 
-_Last updated: 2026-09-10. Read this section first in a new session to see
+_Last updated: 2026-09-12. Read this section first in a new session to see
 what's done and what to do next._
+
+**2026-09-12 redesign:** the fixed-order sequential interactive prompt flow
+built on 2026-09-10 (below) has been replaced with a single-screen menu:
+`setup` (without `--yes`) now prints every setting with its current value at
+once — flags, then existing `config.json`, then the package default, in
+that priority — and lets the user pick a row by number to change, in any
+order, repeating until they press Enter to continue to the existing
+candidate-count preview and confirm-or-cancel step. Choosing `import_mode`
+`date` still immediately asks for `import_since` right there, matching the
+old flow's dependent-field behavior. This was the user's explicit request
+("just a simple menu where you see all options and the selected values next
+to them"), not a defect found in the sequential version — see the 2026-09-12
+session log entry for what changed in `cli.py`/`tests/test_cli.py`. Below,
+"real interactive prompts (as of 2026-09-10)" describes the flow this
+replaced; the menu is now the actual interactive behavior.
 
 **Done:**
 
@@ -177,10 +192,14 @@ what's done and what to do next._
   acceptance so far. Actually running `setup --enable-now` for real is a
   deliberate, separate, explicit decision for whoever does that
   verification — not something to do casually while testing.
-- No interactive-terminal testing of the `input()` prompts in `setup`
-  (confirm-or-cancel, enable-now confirmation) beyond monkeypatching
-  `builtins.input` — real terminal UX (prompt wording, Ctrl-C handling
-  mid-prompt) is untested.
+- Real-terminal testing of `setup`'s `input()` prompts is now done for the
+  settings menu and the confirm-or-cancel step (2026-09-12 session log
+  entry above) — prompt wording, invalid-input reprompting, and Ctrl-C
+  mid-prompt all behave correctly in an actual TTY, not just under
+  monkeypatched `builtins.input`. The one prompt still untested in a real
+  terminal is the separate "Enable background automation now?"
+  confirmation (`--enable-now` without `--yes`), since this pass didn't use
+  `--enable-now`.
 - `doctor`'s `check_archive_root_writable` only checks `os.access`, which
   can disagree with actual write success in edge cases (e.g. some network
   filesystems, ACLs `os.access` doesn't fully model) — accepted as a
@@ -200,14 +219,16 @@ what's done and what to do next._
       resume, monitoring or scheduled mode, and supported scan intervals.
       Setup must disclose that a Documents destination may be iCloud
       Drive-synced according to the user's macOS settings. _`setup.py` +
-      `cli.py`'s `setup` subcommand implement all of this: real
-      interactive prompts (as of 2026-09-10) for any value not given via
-      `--flag`, each defaulting to the current `config.json`'s value (or
-      the package default with no config yet), plus the candidate-count
-      preview and a final y/N confirmation. `--flag`s remain a full
-      non-interactive override path via `--yes`. "Resume" is idempotent
-      re-running of `setup` (tested), not a distinct resume path — as
-      originally written._
+      `cli.py`'s `setup` subcommand implement all of this. As of 2026-09-12,
+      the interactive form is a single menu (`_edit_setup_menu`) showing
+      every setting and its current value at once — resolved from `--flag`,
+      else the current `config.json`, else the package default — editable
+      by number in any order, repeating until Enter is pressed; picking
+      `import_mode` `date` immediately asks for `import_since`. Then the
+      existing candidate-count preview and a final y/N confirmation, same
+      as before. `--flag`s remain a full non-interactive override path via
+      `--yes`, unchanged. "Resume" is idempotent re-running of `setup`
+      (tested), not a distinct resume path — as originally written._
 - [x] Define idempotent user-level `launchd` installation. Treat periodic
       scan as the reliable fallback to folder events; coalesce repeated
       triggers and prevent overlap. _`launchd.py`; overlap prevention is
@@ -292,6 +313,40 @@ _Append one entry per work session: date, what was built/decided, outcome._
   by one early manual check before switching to the fake-`HOME` approach.
   Outcome: 196/196 tests pass; `ruff check`/`ruff format --check` clean;
   first Scope checkbox re-closed.
+- 2026-09-12: Replaced the sequential interactive wizard with a
+  single-screen menu, per the user's explicit request during a Phase 9
+  status check-in (not a defect report — the user found the fixed-order
+  prompt sequence harder to review at a glance than a menu showing
+  everything at once). Added `_format_setup_menu`/`_ensure_import_since`/
+  `_edit_setup_menu` to `cli.py`; `_cmd_setup` now resolves all six
+  settings' starting values up front (flag, else current `config.json`,
+  else package default — the same merge `--yes` already used), then, when
+  not `--yes`, hands that to the menu loop before building the setup plan.
+  Rewrote the four interactive-flow tests in `test_cli.py` around the new
+  input sequence (menu selection digits instead of one input per field) and
+  added a dedicated by-number-edit test. Manually smoke-tested the actual
+  printed menu output via piped stdin under a fake `HOME` (not a real
+  interactive terminal — that gap already existed before this change; see
+  "Not done yet" above). Outcome: 196/196 tests pass; `ruff check`/`ruff
+  format --check` clean.
+- 2026-09-12 (same day, continued): Did the real-terminal verification the
+  prior entry deferred, live with the user against a scratch
+  `/tmp/vma-terminal-test/` tree (never the real Voice Memos folder or
+  config). Confirmed in an actual TTY: the menu prints and edits correctly;
+  an invalid menu digit and an invalid `import_mode` value both reprompt
+  correctly; choosing `date` immediately asks for `import_since`; declining
+  the final confirm writes nothing; Ctrl-C at a prompt exits cleanly (no
+  traceback). **Found and fixed a real bug in the process, pre-dating the
+  menu redesign:** an unreadable/missing `recordings_source` (the user's
+  first attempt, before creating the scratch folder) crashed with a raw
+  Python traceback — `build_setup_plan`'s candidate-count preview calls
+  `discovery.scan`, which raises `ArchiveError`, but `_cmd_setup` only
+  caught `ValueError` around that call. Added an `ArchiveError` catch
+  alongside it (`cli.py`), printing the same clean `[source_unreadable] ...`
+  message `scan` itself already gives, plus a regression test
+  (`test_setup_fails_cleanly_when_recordings_source_does_not_exist`).
+  Outcome: 197/197 tests pass; `ruff check`/`ruff format --check` clean;
+  no interactive-terminal testing gap remains open for this phase.
 
 ## Deviations from the roadmap
 

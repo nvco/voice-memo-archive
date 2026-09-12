@@ -211,9 +211,76 @@ def _prompt_int(label: str, default: int, suggestions: tuple[int, ...]) -> int:
             print("Please enter a whole number of seconds.")
 
 
+def _format_setup_menu(values: dict[str, object]) -> str:
+    since = values["import_since"] or "(not set)"
+    if values["import_mode"] != "date":
+        since = f"{since} — unused unless import mode is 'date'"
+    return "\n".join(
+        [
+            "Current setup:",
+            f"  1) Recordings source      {values['recordings_source']}",
+            f"  2) Archive destination    {values['archive_root']}",
+            f"  3) Import mode            {values['import_mode']}",
+            f"  4) Import since date      {since}",
+            f"  5) Schedule mode          {values['schedule_mode']}",
+            f"  6) Scan interval          {values['scan_interval_seconds']}s",
+        ]
+    )
+
+
+def _ensure_import_since(values: dict[str, object]) -> None:
+    if values["import_mode"] == "date" and not values["import_since"]:
+        values["import_since"] = _prompt_date("Import since date", None)
+
+
+def _edit_setup_menu(values: dict[str, object]) -> None:
+    """Show every setting with its current value; let the user pick one by
+    number to change, repeating until they press Enter to continue. Replaces
+    the old fixed-order sequential wizard (tasks/035-...md) so all settings
+    are visible and editable at once instead of one at a time.
+    """
+    from . import config
+
+    while True:
+        print(_format_setup_menu(values))
+        choice = input("Enter a number to change a setting, or press Enter to continue: ").strip()
+        if not choice:
+            return
+        if choice == "1":
+            values["recordings_source"] = _prompt_text(
+                "Recordings source", str(values["recordings_source"])
+            )
+        elif choice == "2":
+            values["archive_root"] = _prompt_text(
+                "Archive destination", str(values["archive_root"])
+            )
+        elif choice == "3":
+            values["import_mode"] = _prompt_choice(
+                "Import mode", str(values["import_mode"]), sorted(config.IMPORT_MODES)
+            )
+            _ensure_import_since(values)
+        elif choice == "4":
+            values["import_since"] = _prompt_date(
+                "Import since date",
+                values["import_since"],  # type: ignore[arg-type]
+            )
+        elif choice == "5":
+            values["schedule_mode"] = _prompt_choice(
+                "Schedule mode", str(values["schedule_mode"]), sorted(config.SCHEDULE_MODES)
+            )
+        elif choice == "6":
+            values["scan_interval_seconds"] = _prompt_int(
+                "Scan interval seconds",
+                int(values["scan_interval_seconds"]),
+                config.SUPPORTED_SCAN_INTERVALS_SECONDS,
+            )
+        else:
+            print("Please enter one of: 1, 2, 3, 4, 5, 6")
+
+
 def _cmd_setup(args: argparse.Namespace) -> int:
     from . import config, launchd, setup
-    from .errors import ConfigError
+    from .errors import ArchiveError, ConfigError
 
     try:
         existing = config.load_config(args.config)
@@ -224,65 +291,56 @@ def _cmd_setup(args: argparse.Namespace) -> int:
         )
         existing = config.Config()
 
-    recordings_source = str(args.recordings_source) if args.recordings_source else None
-    archive_root = str(args.archive_root) if args.archive_root else None
-    import_mode = args.import_mode
-    import_since = args.import_since
-    schedule_mode = args.schedule_mode
-    scan_interval = args.scan_interval
+    # An omitted flag falls back to the current config value (or the package
+    # default when no config exists yet — `load_config` already returns
+    # `Config()` in that case), never to a hardcoded default outright. This
+    # is what makes `setup --yes --scan-interval 300` a safe way to change
+    # one setting without restating every other one, and it's what seeds the
+    # interactive menu below with the right starting point.
+    resolved_import_mode = args.import_mode or existing.import_mode
     existing_import_since = existing.import_since if existing.import_mode == "date" else None
+    values: dict[str, object] = {
+        "recordings_source": (
+            str(args.recordings_source) if args.recordings_source else existing.recordings_source
+        ),
+        "archive_root": (str(args.archive_root) if args.archive_root else existing.archive_root),
+        "import_mode": resolved_import_mode,
+        "import_since": (
+            args.import_since
+            if args.import_since is not None
+            else (existing_import_since if resolved_import_mode == "date" else None)
+        ),
+        "schedule_mode": args.schedule_mode or existing.schedule_mode,
+        "scan_interval_seconds": (
+            args.scan_interval if args.scan_interval is not None else existing.scan_interval_seconds
+        ),
+    }
 
-    if args.yes:
-        # Non-interactive: an omitted flag falls back to the current
-        # config value (or the package default when no config exists yet
-        # — `load_config` already returns `Config()` in that case), never
-        # to a silent prompt. This is what makes `setup --yes
-        # --scan-interval 300` a safe way to change one setting without
-        # restating every other one.
-        recordings_source = recordings_source or existing.recordings_source
-        archive_root = archive_root or existing.archive_root
-        import_mode = import_mode or existing.import_mode
-        if import_since is None and import_mode == "date":
-            import_since = existing_import_since
-        schedule_mode = schedule_mode or existing.schedule_mode
-        if scan_interval is None:
-            scan_interval = existing.scan_interval_seconds
-    else:
-        # Interactive: prompt for anything not given via flag, showing the
-        # current config's value (or the package default) as the default
-        # the user accepts by pressing Enter. See tasks/035-...md.
-        if recordings_source is None:
-            recordings_source = _prompt_text("Recordings source", existing.recordings_source)
-        if archive_root is None:
-            archive_root = _prompt_text("Archive destination", existing.archive_root)
-        if import_mode is None:
-            import_mode = _prompt_choice(
-                "Import mode", existing.import_mode, sorted(config.IMPORT_MODES)
-            )
-        if import_mode == "date" and import_since is None:
-            import_since = _prompt_date("Import since date", existing_import_since)
-        if schedule_mode is None:
-            schedule_mode = _prompt_choice(
-                "Schedule mode", existing.schedule_mode, sorted(config.SCHEDULE_MODES)
-            )
-        if scan_interval is None:
-            scan_interval = _prompt_int(
-                "Scan interval seconds",
-                existing.scan_interval_seconds,
-                config.SUPPORTED_SCAN_INTERVALS_SECONDS,
-            )
+    if not args.yes:
+        # Interactive: a menu of every setting and its current value (seeded
+        # above from flags/existing config/package defaults), editable by
+        # number, in any order, as many times as wanted. See tasks/035-...md.
+        _ensure_import_since(values)
+        _edit_setup_menu(values)
 
     try:
         plan = setup.build_setup_plan(
-            recordings_source=recordings_source,
-            archive_root=archive_root,
-            import_mode=import_mode,
-            import_since=import_since,
-            schedule_mode=schedule_mode,
-            scan_interval_seconds=scan_interval,
+            recordings_source=str(values["recordings_source"]),
+            archive_root=str(values["archive_root"]),
+            import_mode=str(values["import_mode"]),
+            import_since=values["import_since"],  # type: ignore[arg-type]
+            schedule_mode=str(values["schedule_mode"]),
+            scan_interval_seconds=int(values["scan_interval_seconds"]),
         )
     except ValueError as exc:
         print(f"invalid setup options: {exc}", file=sys.stderr)
+        return 1
+    except ArchiveError as exc:
+        # The candidate-count preview inside build_setup_plan reads the
+        # recordings folder (discovery.scan) before anything is written; a
+        # missing/unreadable source must fail cleanly here, the same way
+        # `scan` itself does, rather than surfacing a raw traceback.
+        print(str(exc), file=sys.stderr)
         return 1
 
     print(f"Recordings source: {plan.recordings_source}")

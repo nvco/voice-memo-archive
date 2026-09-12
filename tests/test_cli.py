@@ -222,20 +222,13 @@ def test_setup_with_yes_writes_config_and_plist_without_enabling(capsys, tmp_pat
     assert "Initial import will consider 0 recording(s)." in out
 
 
-def test_setup_interactive_prompts_use_package_defaults_when_no_existing_config(
-    capsys, tmp_path, monkeypatch
-):
-    # Import mode, schedule mode, and scan interval are left off entirely so
-    # the wizard must prompt for them; pressing Enter (empty answer) on each
-    # should accept the shown default. recordings-source/archive-root are
-    # still given explicitly per this file's own convention of never
-    # touching cli.py's real Application-Support/Voice-Memos defaults.
+def test_setup_fails_cleanly_when_recordings_source_does_not_exist(capsys, tmp_path, monkeypatch):
+    # The candidate-count preview inside build_setup_plan reads the
+    # recordings folder before anything is written; a missing/unreadable
+    # source must fail cleanly (exit 1, a short message on stderr), not
+    # crash with a raw traceback — matches how `scan` itself behaves.
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    responses = iter(["", "", "", "y"])
-    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     config_path = tmp_path / "config.json"
-    recordings_source = tmp_path / "recordings"
-    recordings_source.mkdir()
 
     exit_code = main(
         [
@@ -245,25 +238,28 @@ def test_setup_interactive_prompts_use_package_defaults_when_no_existing_config(
             "--state",
             str(tmp_path / "state.json"),
             "--recordings-source",
-            str(recordings_source),
+            str(tmp_path / "does-not-exist"),
             "--archive-root",
             str(tmp_path / "archive"),
+            "--yes",
         ]
     )
-    assert exit_code == 0
-    written = json.loads(config_path.read_text())
-    assert written["import_mode"] == "all"
-    assert written["schedule_mode"] == "monitoring"
-    assert written["scan_interval_seconds"] == 900
+    assert exit_code == 1
+    assert "source_unreadable" in capsys.readouterr().err
+    assert not config_path.exists()
 
 
-def test_setup_interactive_reprompts_on_invalid_choice_then_accepts_a_valid_one(
+def test_setup_interactive_menu_accepts_defaults_when_no_existing_config(
     capsys, tmp_path, monkeypatch
 ):
+    # Import mode, schedule mode, and scan interval are left off entirely so
+    # the menu must seed them from package defaults; pressing Enter at the
+    # menu accepts every shown value unchanged. recordings-source/
+    # archive-root are still given explicitly per this file's own convention
+    # of never touching cli.py's real Application-Support/Voice-Memos
+    # defaults.
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    # import_mode: invalid, then "date"; import_since: a valid date;
-    # schedule_mode/scan_interval: accept defaults; confirm: yes.
-    responses = iter(["bogus", "date", "2026-01-01", "", "", "y"])
+    responses = iter(["", "y"])  # menu: continue with no edits; confirm: yes
     monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     config_path = tmp_path / "config.json"
     recordings_source = tmp_path / "recordings"
@@ -284,19 +280,52 @@ def test_setup_interactive_reprompts_on_invalid_choice_then_accepts_a_valid_one(
     )
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "Please enter one of" in out
+    assert "Current setup:" in out
+    written = json.loads(config_path.read_text())
+    assert written["import_mode"] == "all"
+    assert written["schedule_mode"] == "monitoring"
+    assert written["scan_interval_seconds"] == 900
+
+
+def test_setup_interactive_menu_edits_a_setting_by_number(capsys, tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Menu: an invalid selection, then edit import mode (3) — an invalid
+    # choice there, then a valid one ("date"), which immediately asks for
+    # the now-required import-since date; back at the menu, continue; then
+    # confirm.
+    responses = iter(["9", "3", "bogus", "date", "2026-01-01", "", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+    config_path = tmp_path / "config.json"
+    recordings_source = tmp_path / "recordings"
+    recordings_source.mkdir()
+
+    exit_code = main(
+        [
+            "setup",
+            "--config",
+            str(config_path),
+            "--state",
+            str(tmp_path / "state.json"),
+            "--recordings-source",
+            str(recordings_source),
+            "--archive-root",
+            str(tmp_path / "archive"),
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Please enter one of: 1, 2, 3, 4, 5, 6" in out  # the "9" selection
+    assert "Please enter one of: all/date/new_only" in out  # the "bogus" mode
     written = json.loads(config_path.read_text())
     assert written["import_mode"] == "date"
     assert written["import_since"] == "2026-01-01"
 
 
-def test_setup_interactive_prompts_seed_defaults_from_existing_config(
-    capsys, tmp_path, monkeypatch
-):
+def test_setup_interactive_menu_seeds_defaults_from_existing_config(capsys, tmp_path, monkeypatch):
     # Re-running setup to change one setting should mean "accept every
-    # prompt's default except the one you want to change" — each default
-    # must come from the *current* config.json, not the package's
-    # hardcoded defaults. Per tasks/035-...md's "Also requested" note.
+    # menu row's default except the one you want to change" — each default
+    # must come from the *current* config.json, not the package's hardcoded
+    # defaults. Per tasks/035-...md's "Also requested" note.
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config_path = tmp_path / "config.json"
     state_path = tmp_path / "state.json"
@@ -324,8 +353,9 @@ def test_setup_interactive_prompts_seed_defaults_from_existing_config(
     capsys.readouterr()
 
     # Second run: only scan-interval is given explicitly; everything else
-    # must be prompted for, defaulting to what's already in config.json.
-    responses = iter(["", "", "", "y"])  # archive_root, import_mode, schedule_mode, confirm
+    # must be seeded from what's already in config.json, and accepted as-is
+    # by continuing past the menu with no edits.
+    responses = iter(["", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     second_run = main(
         [
@@ -341,6 +371,8 @@ def test_setup_interactive_prompts_seed_defaults_from_existing_config(
         ]
     )
     assert second_run == 0
+    out = capsys.readouterr().out
+    assert str(archive_root) in out  # shown in the menu, unchanged from before
     written = json.loads(config_path.read_text())
     assert written["archive_root"] == str(archive_root)
     assert written["schedule_mode"] == "scheduled"  # preserved, not reset to "monitoring"
@@ -349,10 +381,11 @@ def test_setup_interactive_prompts_seed_defaults_from_existing_config(
 
 def test_setup_declined_without_yes_writes_nothing(capsys, tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    # Every value-selecting flag is given explicitly so the only interactive
-    # prompt reached is the final "Proceed?" confirmation this test targets
-    # — "n" answers whichever single prompt is actually asked.
-    monkeypatch.setattr("builtins.input", lambda prompt="": "n")
+    # Every value-selecting flag is given explicitly, so the menu already
+    # shows exactly what will be written; continue past it with no edits,
+    # then decline the final "Proceed?" confirmation this test targets.
+    responses = iter(["", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     config_path = tmp_path / "config.json"
     recordings_source = tmp_path / "recordings"
     recordings_source.mkdir()
