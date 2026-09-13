@@ -82,16 +82,6 @@ def test_build_setup_plan_rejects_unknown_import_mode():
         build_setup_plan(import_mode="whenever")
 
 
-def test_build_setup_plan_rejects_unknown_schedule_mode(tmp_path: Path):
-    with pytest.raises(ValueError):
-        build_setup_plan(recordings_source=str(tmp_path / "recordings"), schedule_mode="always")
-
-
-def test_build_setup_plan_rejects_non_positive_interval(tmp_path: Path):
-    with pytest.raises(ValueError):
-        build_setup_plan(recordings_source=str(tmp_path / "recordings"), scan_interval_seconds=0)
-
-
 def test_build_setup_plan_flags_documents_archive_root(tmp_path: Path):
     plan = build_setup_plan(
         recordings_source=str(tmp_path / "recordings"),
@@ -115,8 +105,6 @@ def test_commit_setup_writes_config_and_sets_completed_at(tmp_path: Path):
         recordings_source=str(recordings_source),
         archive_root=str(archive_root),
         import_mode="new_only",
-        schedule_mode="scheduled",
-        scan_interval_seconds=1800,
     )
     committed = commit_setup(config_path, plan, now=lambda: datetime(2024, 1, 15, 12, 0))
 
@@ -125,8 +113,6 @@ def test_commit_setup_writes_config_and_sets_completed_at(tmp_path: Path):
     assert saved.recordings_source == str(recordings_source)
     assert saved.archive_root == str(archive_root)
     assert saved.import_mode == "new_only"
-    assert saved.schedule_mode == "scheduled"
-    assert saved.scan_interval_seconds == 1800
     assert saved.setup_completed_at == committed.setup_completed_at
 
 

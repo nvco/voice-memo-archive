@@ -1,7 +1,7 @@
 import errno
 from pathlib import Path
 
-from voice_memo_archive import diagnostics, launchd
+from voice_memo_archive import diagnostics
 from voice_memo_archive.config import Config, save_config
 from voice_memo_archive.state import RecordingState, RecordingStatus, State, save_state
 
@@ -83,23 +83,6 @@ def test_check_state_invalid_is_reported_as_self_healing(tmp_path: Path):
     assert "self-heal" in result.detail
 
 
-def test_check_scheduler_reports_loaded(monkeypatch):
-    monkeypatch.setattr(launchd, "is_loaded", lambda: True)
-    assert diagnostics.check_scheduler().ok is True
-
-
-def test_check_scheduler_reports_not_loaded(monkeypatch):
-    monkeypatch.setattr(launchd, "is_loaded", lambda: False)
-    assert diagnostics.check_scheduler().ok is False
-
-
-def test_check_scheduler_reports_unknown_as_ok(monkeypatch):
-    monkeypatch.setattr(launchd, "is_loaded", lambda: None)
-    result = diagnostics.check_scheduler()
-    assert result.ok is True
-    assert "unknown" in result.detail
-
-
 def test_check_pending_work_flags_needs_attention_and_conflict(tmp_path: Path):
     path = tmp_path / "state.json"
     save_state(
@@ -122,8 +105,7 @@ def test_check_pending_work_ok_when_nothing_needs_attention(tmp_path: Path):
     assert diagnostics.check_pending_work(path).ok is True
 
 
-def test_run_doctor_aggregates_every_check(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(launchd, "is_loaded", lambda: None)
+def test_run_doctor_aggregates_every_check(tmp_path: Path):
     config_path = tmp_path / "config.json"
     state_path = tmp_path / "state.json"
     recordings_source = tmp_path / "recordings"
@@ -140,18 +122,16 @@ def test_run_doctor_aggregates_every_check(tmp_path: Path, monkeypatch):
         "recordings_source",
         "archive_root",
         "state",
-        "scheduler",
         "pending_work",
     ]
     assert all(r.ok for r in results)
 
 
-def test_run_doctor_skips_rather_than_guesses_when_config_is_invalid(tmp_path: Path, monkeypatch):
+def test_run_doctor_skips_rather_than_guesses_when_config_is_invalid(tmp_path: Path):
     # A corrupt config.json might be hiding a customized recordings_source
     # — falling back to the real global default and scanning *that* would
     # be both wrong and, on a real machine, a genuine privacy hazard. Must
     # skip, not silently substitute the default.
-    monkeypatch.setattr(launchd, "is_loaded", lambda: None)
     config_path = tmp_path / "config.json"
     config_path.write_text("not json")
 

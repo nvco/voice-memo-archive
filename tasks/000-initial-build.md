@@ -19,12 +19,12 @@ When an issue changes product intent, update the brief first. When it changes se
 0. [x] Repository baseline and privacy preflight
 1. [ ] Platform feasibility and data contract
 2. [x] Foundation and test harness
-3. [ ] File discovery and source metadata
+3. [x] File discovery and source metadata
 4. [x] Native transcript extraction and fidelity
-5. [ ] Archive output, deduplication, and conflicts
-6. [ ] Operational state, retries, and recovery
-7. [ ] Setup, automation, and diagnostics
-8. [ ] Packaging, permissions, and privacy
+5. [x] Archive output, deduplication, and conflicts
+6. [x] Operational state, retries, and recovery
+7. [x] Setup, automation, and diagnostics
+8. [x] Packaging, permissions, and privacy
 9. [ ] End-to-end verification and release readiness
 
 No implementation phase begins until its stated dependencies and exit criteria are met. A failure to validate an Apple format must create a visible unsupported case or a revised plan; it must not trigger a fallback to third-party transcription.
@@ -126,9 +126,9 @@ Phase 2.
 
 ### Exit criteria
 
-- [ ] Discovery has no write, rename, delete, or database-modification path under Voice Memos storage.
-- [ ] Candidate status is deterministic and carries sufficient factual information for retries and conflicts.
-- [ ] Import modes remain correct when source delivery is delayed.
+- [x] Discovery has no write, rename, delete, or database-modification path under Voice Memos storage.
+- [x] Candidate status is deterministic and carries sufficient factual information for retries and conflicts.
+- [x] Import modes remain correct when source delivery is delayed.
 
 ## Phase 4: Native transcript extraction and fidelity
 
@@ -287,6 +287,36 @@ All prior phases.
 
 ## Plan history
 
+- 2026-09-12: Phase 7's `launchd` background-automation feature — built
+  and verified as described below at the time — was later removed
+  entirely, on the user's explicit decision after real-world friction
+  with it (Gatekeeper's "unidentified developer" warning, settings spread
+  across the OS, a single global plist a scratch test run silently
+  overwrote). See `tasks/050-remove-background-automation.md` for the
+  full removal. This entry is a pointer only: Phase 7/8's text below is
+  left as-is, describing what was actually built and verified at the
+  time, not retroactively corrected — this is a later removal decision,
+  not evidence Phase 7 was done wrong.
+- 2026-09-12: Documentation correction, no code change: the top-level
+  "Build order" checklist above had drifted out of sync with this same
+  file's own per-phase "Exit criteria" lists — Phases 3, 5, 6, 7, and 8
+  were fully checked off in their own Exit criteria sections (confirmed
+  against each phase's dedicated task file: `015`/`025`/`030`/`035`/`040`)
+  but still showed `[ ]` at the top, apparently never flipped when those
+  phases actually completed. Corrected to match. Also checked Phase 3's
+  third exit criterion itself ("Import modes remain correct when source
+  delivery is delayed") — genuinely open at Phase 3's own completion
+  (`015` still correctly leaves it unchecked, by that file's own
+  documented convention of not backdating a checkbox to a phase that
+  didn't complete it), but since resolved by Phase 7's
+  `scheduling.import_cutoff_date`/`passes_import_cutoff` (keyed on
+  `recorded_at`, not discovery time, specifically to handle a delayed
+  iCloud download — tested by
+  `test_import_cutoff_never_retroactively_excludes_an_already_tracked_recording`)
+  and confirmed against real delayed-empty recordings in Phase 9. Phase 1
+  and Phase 9 are left unchecked at both levels — both still have a
+  genuinely open exit criterion in their own dedicated files (`005`,
+  `045`), not a staleness bug.
 - 2026-09-08: Clarified the read-only, command-line-only product boundary: no Voice Memos database access, transcription fallback, or graphical app. Added verified-layout investigation for local `.m4a`/`.qta` samples; `status`, retry, and acknowledgment behavior; and the default archive root, `~/Documents/Voice Memo Archive/`.
 - 2026-09-08: Chose Python as the implementation language/toolchain, ahead of Phase 2. Phase 8's "no developer runtime" install requirement means the eventual distribution must bundle its own interpreter (e.g. a frozen/py2app-style build) rather than relying on a system Python — record this as a Phase 8 constraint to revisit when packaging is scoped.
 - 2026-09-08: Added Phase 0 so the committed public baseline, local-only privacy boundary, and detailed Phase 1 task plan are mandatory prerequisites for implementation.

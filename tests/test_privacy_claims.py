@@ -6,9 +6,7 @@
 `tests/test_extraction.py` already proves the no-network claim for
 `extraction.extract_transcript` alone; this file proves it across the
 whole `cli.py` command surface instead, since that's the actual product
-boundary a user (or `launchd`) invokes. Every `launchd`/`subprocess`
-touchpoint is mocked here too — this file is about proving the product
-itself never opens a socket, not about exercising real `launchctl`.
+boundary a user invokes.
 """
 
 import json
@@ -17,7 +15,6 @@ from pathlib import Path
 
 import mp4_builders as mp4
 
-from voice_memo_archive import launchd
 from voice_memo_archive.archive import write_archive_entry
 from voice_memo_archive.cli import main
 from voice_memo_archive.config import load_config
@@ -66,10 +63,6 @@ def test_scan_never_opens_a_network_socket(tmp_path: Path, monkeypatch):
 
 
 def test_status_doctor_verify_reconcile_never_open_a_network_socket(tmp_path: Path, monkeypatch):
-    # is_loaded's own real subprocess call is a separate concern (proven
-    # not-a-socket-call in test_launchd.py); mocked here purely so this
-    # test doesn't also depend on a real launchctl being present.
-    monkeypatch.setattr(launchd, "is_loaded", lambda: None)
     config_path, _recordings_source, _archive_root = _write_synthetic_project(tmp_path)
     state_path = tmp_path / "state.json"
     _block_sockets(monkeypatch)
@@ -97,18 +90,6 @@ def test_setup_never_opens_a_network_socket(tmp_path: Path, monkeypatch):
             str(recordings_source),
             "--yes",
         ]
-    )
-    assert exit_code == 0
-
-
-def test_uninstall_never_opens_a_network_socket(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(launchd, "bootout", lambda: None)
-    config_path, _recordings_source, _archive_root = _write_synthetic_project(tmp_path)
-    _block_sockets(monkeypatch)
-
-    exit_code = main(
-        ["uninstall", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
     )
     assert exit_code == 0
 
@@ -167,10 +148,7 @@ def test_archive_file_itself_legitimately_contains_the_transcript(tmp_path: Path
     assert TRANSCRIPT_MARKER in archived_text
 
 
-def test_doctor_output_never_contains_transcript_text(capsys, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(
-        launchd, "is_loaded", lambda: None
-    )  # avoid a real launchctl subprocess call
+def test_doctor_output_never_contains_transcript_text(capsys, tmp_path: Path):
     config_path, _recordings_source, archive_root = _write_synthetic_project(tmp_path)
     metadata = {
         "recording_id": "REC-1",

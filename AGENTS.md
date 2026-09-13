@@ -38,7 +38,7 @@ than silently changing, discarding, or replacing source material.
 - Keep generated YAML metadata factual. Do not add AI-generated summaries, titles, tags, or interpretations to the source archive.
 - Use `config.json` for user settings and `state.json` for operational state, retry tracking, and scan history.
 - Do not create archive files for empty or transcript-less recordings.
-- Provide a command-line interface and user-level `launchd` automation; do not add a separate graphical application.
+- Provide a command-line interface only; do not add a separate graphical application. Every run is a one-shot, user-invoked `scan` — there is no background/scheduled automation (removed; see `tasks/050-remove-background-automation.md`).
 
 ## Development setup
 

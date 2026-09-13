@@ -3,9 +3,11 @@
 Drives one scan under `io_utils.ScanLock`: calls `discovery.scan()`, then
 for each candidate with a resolvable recording ID, attempts
 `extraction.extract_transcript()` and `archive.write_archive_entry()` and
-records the outcome as a `state.RecordingState`. The CLI (`cli.py`) and,
-eventually, `launchd` (Phase 7) are both thin callers of `run_scan` — the
-workflow itself lives here, once, not duplicated per caller.
+records the outcome as a `state.RecordingState`. `cli.py`'s `scan`
+subcommand is a thin caller of `run_scan` — the workflow itself lives
+here, once, not duplicated per caller. (Phase 7 originally added a
+`launchd`-based caller too; removed in
+`tasks/050-remove-background-automation.md`.)
 
 Status mapping (see `tasks/030-...md` for the full reasoning):
 

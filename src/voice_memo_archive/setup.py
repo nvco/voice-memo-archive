@@ -28,8 +28,6 @@ class SetupPlan:
     archive_root: str
     import_mode: str
     import_since: str | None
-    schedule_mode: str
-    scan_interval_seconds: int
     candidate_preview_count: int
     # True if archive_root resolves under ~/Documents, which macOS *may*
     # sync via iCloud Drive depending on the user's own System Settings —
@@ -76,18 +74,12 @@ def build_setup_plan(
     archive_root: str | None = None,
     import_mode: str = config.DEFAULT_IMPORT_MODE,
     import_since: str | None = None,
-    schedule_mode: str = config.DEFAULT_SCHEDULE_MODE,
-    scan_interval_seconds: int = config.DEFAULT_SCAN_INTERVAL_SECONDS,
 ) -> SetupPlan:
     """Validate the chosen options and preview the initial import. No side effects."""
     if import_mode not in config.IMPORT_MODES:
         raise ValueError(f"unknown import_mode: {import_mode!r}")
     if import_mode == "date" and not import_since:
         raise ValueError("import_since is required when import_mode is 'date'")
-    if schedule_mode not in config.SCHEDULE_MODES:
-        raise ValueError(f"unknown schedule_mode: {schedule_mode!r}")
-    if scan_interval_seconds <= 0:
-        raise ValueError("scan_interval_seconds must be positive")
 
     resolved_recordings_source = recordings_source or config.DEFAULT_RECORDINGS_SOURCE
     resolved_archive_root = archive_root or config.DEFAULT_ARCHIVE_ROOT
@@ -103,8 +95,6 @@ def build_setup_plan(
         archive_root=resolved_archive_root,
         import_mode=import_mode,
         import_since=import_since,
-        schedule_mode=schedule_mode,
-        scan_interval_seconds=scan_interval_seconds,
         candidate_preview_count=candidate_count,
         archive_root_may_sync=may_be_icloud_synced(resolved_archive_root),
     )
@@ -125,8 +115,6 @@ def commit_setup(
         import_mode=plan.import_mode,
         import_since=plan.import_since,
         setup_completed_at=completed_at,
-        schedule_mode=plan.schedule_mode,
-        scan_interval_seconds=plan.scan_interval_seconds,
     )
     config.save_config(config_path, new_config)
     return dataclasses.replace(plan, setup_completed_at=completed_at)

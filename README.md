@@ -58,24 +58,21 @@ This walks you through:
 - **Initial import scope** — `all` (every existing recording), `new_only`
   (nothing existing yet, only recordings made from today onward), or
   `date` (only recordings from a date you choose onward).
-- **Schedule** — `monitoring` (near-real-time via a folder watch, plus a
-  periodic scan as a reliable fallback) or `scheduled` (periodic only),
-  and how often to scan.
 
 `setup` shows you exactly how many recordings the initial import will
 consider *before* anything is written, and asks for confirmation unless
-you pass `--yes`. It writes your choices to `config.json` and prepares a
-`launchd` automation file, but — deliberately, as an extra safety margin —
-only actually registers that background job with macOS if you also pass
-`--enable-now` (with its own separate confirmation). Until then, nothing
-runs automatically; you can run scans manually with `scan` any time.
+you pass `--yes`. It writes your choices to `config.json`. There is no
+background automation of any kind — this tool never registers anything
+with `launchd`, cron, or any other scheduler, and nothing runs unless you
+run it. Pull in new recordings any time with `scan` (see below); a shell
+alias or an occasional habit is all the "automation" this tool offers.
 
 ## Everyday use
 
 ```sh
-voice-memo-archive scan       # run one scan now
+voice-memo-archive scan       # run one scan now, pulling in anything new
 voice-memo-archive status     # what's archived, what needs attention
-voice-memo-archive doctor     # diagnose access/permission/scheduling problems
+voice-memo-archive doctor     # diagnose access/permission problems
 ```
 
 If something needs your attention (a recording that failed repeatedly, or
@@ -108,25 +105,20 @@ voice-memo-archive reconcile                   # rebuild tracking state from the
 
 ## Uninstalling
 
+There is no background service to uninstall — everything this tool does
+happens only while a command is actually running. To remove it entirely:
+
 ```sh
-voice-memo-archive uninstall
+rm "$HOME/Library/Application Support/Voice Memo Archive/config.json" \
+   "$HOME/Library/Application Support/Voice Memo Archive/state.json"
 ```
 
-This removes the background automation (the `launchd` job) only. **It
-never touches your archive** — that guarantee is structural: the uninstall
-code has no path that even reads your archive location, let alone writes
-to it. Your archived Markdown files are exactly where you left them
-afterward.
-
-Add `--purge-config` if you also want to remove `config.json`/`state.json`
-(your settings and internal bookkeeping) for a fully clean slate. This is
-optional and off by default, since those are easy to lose and easy to
-regenerate by running `setup` again — deleting them isn't necessary just
-to stop the background service.
-
-To finish removing the tool entirely, also delete the `.venv` you created
-during installation (and the cloned repository, if you don't plan to use
-it again).
+(Optional, and only your settings/internal bookkeeping — never your
+archive; easy to lose and easy to regenerate by running `setup` again.)
+Then delete the `.venv` you created during installation, and the cloned
+repository if you don't plan to use it again. **Your archived Markdown
+files are untouched by any of this** — nothing above ever reads or writes
+your archive location.
 
 ## Known limitations
 

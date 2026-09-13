@@ -15,7 +15,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import config, launchd
+from . import config
 from .errors import ConfigError, StateError
 from .paths import redact_home_path
 from .state import RecordingStatus, load_state
@@ -99,15 +99,6 @@ def check_state(state_path: Path) -> CheckResult:
     return CheckResult("state", True, "valid")
 
 
-def check_scheduler() -> CheckResult:
-    loaded = launchd.is_loaded()
-    if loaded is None:
-        return CheckResult("scheduler", True, "unknown (launchctl unavailable)")
-    if loaded:
-        return CheckResult("scheduler", True, "loaded")
-    return CheckResult("scheduler", False, "not loaded — run `setup` to install automation")
-
-
 def check_pending_work(state_path: Path) -> CheckResult:
     try:
         state = load_state(state_path)
@@ -142,6 +133,5 @@ def run_doctor(*, config_path: Path, state_path: Path) -> tuple[CheckResult, ...
         recordings_result,
         archive_root_result,
         check_state(state_path),
-        check_scheduler(),
         check_pending_work(state_path),
     )

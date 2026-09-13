@@ -196,3 +196,21 @@ own "Plan history," and per-task deviations live in each task-plan file.
   reconfigure. `--yes` remains fully non-interactive for scripted use.
   196 tests total; `ruff` lint/format clean. See
   `tasks/035-setup-automation-and-diagnostics.md`.
+- Replaced `setup`'s sequential interactive wizard with a single-screen
+  menu showing every setting and its current value at once, editable by
+  number in any order. See `tasks/035-setup-automation-and-diagnostics.md`.
+
+### Removed
+
+- Removed `launchd` background automation entirely: the `launchd.py`
+  module, `schedule_mode`/`scan_interval_seconds` config fields, the
+  `setup --schedule-mode`/`--scan-interval`/`--enable-now` flags, the
+  `uninstall` subcommand, and `doctor`'s scheduler check. This tool is
+  now a one-shot, user-invoked CLI only — run `scan` yourself whenever
+  you want new recordings pulled in. Decided after real background-
+  automation use surfaced more friction (a macOS "unidentified developer"
+  Background Items warning, settings spread across the OS, a single
+  global `launchd` job silently overwritten by an unrelated test run)
+  than value for a personal-use tool. An old `config.json` with the
+  now-removed fields still loads fine; they're simply ignored. See
+  `tasks/050-remove-background-automation.md`.

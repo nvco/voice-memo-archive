@@ -84,8 +84,6 @@ def test_load_config_without_phase7_fields_uses_defaults(tmp_path: Path):
     assert config.import_mode == "all"
     assert config.import_since is None
     assert config.setup_completed_at is None
-    assert config.schedule_mode == "monitoring"
-    assert config.scan_interval_seconds == 900
 
 
 def test_save_then_load_round_trip_with_phase7_fields(tmp_path: Path):
@@ -94,11 +92,30 @@ def test_save_then_load_round_trip_with_phase7_fields(tmp_path: Path):
         import_mode="date",
         import_since="2024-06-01",
         setup_completed_at="2024-06-15T12:00:00Z",
-        schedule_mode="scheduled",
-        scan_interval_seconds=1800,
     )
     save_config(path, original)
     assert load_config(path) == original
+
+
+def test_load_config_ignores_legacy_schedule_fields(tmp_path: Path):
+    # A config.json written before background automation was removed
+    # (tasks/050-...md) has schedule_mode/scan_interval_seconds keys —
+    # loading it must not fail or resurrect them, just ignore them.
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recordings_source": "/x",
+                "archive_root": "/y",
+                "schedule_mode": "monitoring",
+                "scan_interval_seconds": 900,
+            }
+        )
+    )
+    config = load_config(path)
+    assert not hasattr(config, "schedule_mode")
+    assert not hasattr(config, "scan_interval_seconds")
 
 
 def test_load_config_rejects_unknown_import_mode(tmp_path: Path):
@@ -110,38 +127,6 @@ def test_load_config_rejects_unknown_import_mode(tmp_path: Path):
                 "recordings_source": "/x",
                 "archive_root": "/y",
                 "import_mode": "sometimes",
-            }
-        )
-    )
-    with pytest.raises(ConfigError):
-        load_config(path)
-
-
-def test_load_config_rejects_unknown_schedule_mode(tmp_path: Path):
-    path = tmp_path / "config.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "recordings_source": "/x",
-                "archive_root": "/y",
-                "schedule_mode": "always",
-            }
-        )
-    )
-    with pytest.raises(ConfigError):
-        load_config(path)
-
-
-def test_load_config_rejects_non_positive_scan_interval(tmp_path: Path):
-    path = tmp_path / "config.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "recordings_source": "/x",
-                "archive_root": "/y",
-                "scan_interval_seconds": 0,
             }
         )
     )

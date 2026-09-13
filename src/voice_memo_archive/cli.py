@@ -1,16 +1,11 @@
 """Command-line entry point.
 
 Deliberately thin: each subcommand parses arguments and calls straight into
-`setup`/`scheduling`/`archive`/`diagnostics`/`launchd`, so the workflow
-itself is never defined here — `launchd`'s own scheduled invocation calls
-the same `scan` entry point directly, not a second copy of its logic.
-
-`setup` writes the `launchd` plist unconditionally (safe — it's just a
-file) but only ever actually registers it with the running `launchd`
-(`launchd.bootstrap`, a real, persistent system change) behind `--yes`/
-`--enable-now` and an interactive confirmation otherwise — see
-`tasks/035-...md` for why this is deliberately more cautious than
-"idempotent installation" alone might suggest.
+`setup`/`scheduling`/`archive`/`diagnostics`, so the workflow itself is
+never defined here. There is no background/scheduled invocation — every
+command is a one-shot, user-invoked run; see
+`tasks/050-remove-background-automation.md` for why the earlier `launchd`
+automation feature was removed.
 """
 
 from __future__ import annotations
@@ -199,18 +194,6 @@ def _prompt_date(label: str, default: str | None) -> str:
         return candidate
 
 
-def _prompt_int(label: str, default: int, suggestions: tuple[int, ...]) -> int:
-    options = "/".join(str(s) for s in suggestions)
-    while True:
-        answer = input(f"{label} ({options}) [{default}]: ").strip()
-        if not answer:
-            return default
-        try:
-            return int(answer)
-        except ValueError:
-            print("Please enter a whole number of seconds.")
-
-
 def _format_setup_menu(values: dict[str, object]) -> str:
     since = values["import_since"] or "(not set)"
     if values["import_mode"] != "date":
@@ -222,8 +205,6 @@ def _format_setup_menu(values: dict[str, object]) -> str:
             f"  2) Archive destination    {values['archive_root']}",
             f"  3) Import mode            {values['import_mode']}",
             f"  4) Import since date      {since}",
-            f"  5) Schedule mode          {values['schedule_mode']}",
-            f"  6) Scan interval          {values['scan_interval_seconds']}s",
         ]
     )
 
@@ -264,22 +245,12 @@ def _edit_setup_menu(values: dict[str, object]) -> None:
                 "Import since date",
                 values["import_since"],  # type: ignore[arg-type]
             )
-        elif choice == "5":
-            values["schedule_mode"] = _prompt_choice(
-                "Schedule mode", str(values["schedule_mode"]), sorted(config.SCHEDULE_MODES)
-            )
-        elif choice == "6":
-            values["scan_interval_seconds"] = _prompt_int(
-                "Scan interval seconds",
-                int(values["scan_interval_seconds"]),
-                config.SUPPORTED_SCAN_INTERVALS_SECONDS,
-            )
         else:
-            print("Please enter one of: 1, 2, 3, 4, 5, 6")
+            print("Please enter one of: 1, 2, 3, 4")
 
 
 def _cmd_setup(args: argparse.Namespace) -> int:
-    from . import config, launchd, setup
+    from . import config, setup
     from .errors import ArchiveError, ConfigError
 
     try:
@@ -310,10 +281,6 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             if args.import_since is not None
             else (existing_import_since if resolved_import_mode == "date" else None)
         ),
-        "schedule_mode": args.schedule_mode or existing.schedule_mode,
-        "scan_interval_seconds": (
-            args.scan_interval if args.scan_interval is not None else existing.scan_interval_seconds
-        ),
     }
 
     if not args.yes:
@@ -329,8 +296,6 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             archive_root=str(values["archive_root"]),
             import_mode=str(values["import_mode"]),
             import_since=values["import_since"],  # type: ignore[arg-type]
-            schedule_mode=str(values["schedule_mode"]),
-            scan_interval_seconds=int(values["scan_interval_seconds"]),
         )
     except ValueError as exc:
         print(f"invalid setup options: {exc}", file=sys.stderr)
@@ -353,7 +318,6 @@ def _cmd_setup(args: argparse.Namespace) -> int:
     since_note = f" (since {plan.import_since})" if plan.import_since else ""
     print(f"Import mode: {plan.import_mode}{since_note}")
     print(f"Initial import will consider {plan.candidate_preview_count} recording(s).")
-    print(f"Schedule: {plan.schedule_mode}, every {plan.scan_interval_seconds}s")
 
     if not args.yes:
         answer = input("Proceed with this setup? [y/N] ").strip().lower()
@@ -361,60 +325,10 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             print("Setup cancelled; nothing was changed.")
             return 0
 
-    committed = setup.commit_setup(args.config, plan)
+    setup.commit_setup(args.config, plan)
     print(f"Wrote {args.config}")
+    print("Run `scan` any time to pull in new recordings.")
 
-    plist_path = launchd.install(
-        config_path=args.config,
-        state_path=args.state,
-        recordings_source=Path(committed.recordings_source).expanduser(),
-        schedule_mode=committed.schedule_mode,
-        scan_interval_seconds=committed.scan_interval_seconds,
-    )
-    print(f"Wrote {plist_path}")
-
-    manual_hint = f"launchctl bootstrap gui/$(id -u) {plist_path}"
-    if args.enable_now:
-        enable = args.yes
-        if not enable:
-            answer = input("Enable background automation now? [y/N] ").strip().lower()
-            enable = answer in ("y", "yes")
-        if enable:
-            launchd.bootstrap(plist_path)
-            print("Background automation enabled.")
-        else:
-            print(f"Not enabled. Enable later with: {manual_hint}")
-    else:
-        print(f"Background automation not enabled. Enable later with: {manual_hint}")
-
-    return 0
-
-
-def _cmd_uninstall(args: argparse.Namespace) -> int:
-    """Remove the background service. Never touches the archive tree.
-
-    Per `tasks/000-initial-build.md` Phase 8: "Uninstalling the service
-    must not delete the user's archive." This command has no code path
-    that reads `archive_root` at all, let alone writes to it — not a
-    redaction, a structural guarantee.
-    """
-    from . import launchd
-
-    launchd.bootout()  # safe/no-op if nothing was ever registered
-    plist_path = launchd.plist_path()
-    if plist_path.exists():
-        plist_path.unlink()
-        print(f"Removed {plist_path}")
-    else:
-        print("No launchd job was installed.")
-
-    if args.purge_config:
-        for path in (args.config, args.state):
-            if path.exists():
-                path.unlink()
-                print(f"Removed {path}")
-
-    print("Your archive was not touched and remains at its configured location.")
     return 0
 
 
@@ -474,7 +388,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.set_defaults(func=_cmd_verify)
 
     setup_parser = subparsers.add_parser(
-        "setup", help="configure source, destination, and schedule"
+        "setup", help="configure source, destination, and import scope"
     )
     add_config_state_args(setup_parser)
     # No `default=` on any of these (beyond argparse's implicit None): an
@@ -492,40 +406,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     setup_parser.add_argument("--import-since", dest="import_since")
     setup_parser.add_argument(
-        "--schedule-mode",
-        choices=sorted(config.SCHEDULE_MODES),
-        default=None,
-        dest="schedule_mode",
-    )
-    setup_parser.add_argument(
-        "--scan-interval",
-        type=int,
-        choices=list(config.SUPPORTED_SCAN_INTERVALS_SECONDS),
-        default=None,
-        dest="scan_interval",
-    )
-    setup_parser.add_argument(
         "--yes", action="store_true", help="skip confirmation prompts (for scripted use)"
     )
-    setup_parser.add_argument(
-        "--enable-now",
-        action="store_true",
-        dest="enable_now",
-        help="also register the scan job with launchd immediately",
-    )
     setup_parser.set_defaults(func=_cmd_setup)
-
-    uninstall_parser = subparsers.add_parser(
-        "uninstall", help="remove the background service (never touches the archive)"
-    )
-    add_config_state_args(uninstall_parser)
-    uninstall_parser.add_argument(
-        "--purge-config",
-        action="store_true",
-        dest="purge_config",
-        help="also remove config.json/state.json (settings/bookkeeping only, never the archive)",
-    )
-    uninstall_parser.set_defaults(func=_cmd_uninstall)
 
     return parser
 

@@ -166,6 +166,61 @@ _Append one entry per work session: date, what was built/decided, outcome._
   a confirmed design decision, not an open question: do not add a
   command that deletes the archive tree without this decision being
   revisited with the user first.
+- 2026-09-12: After enabling background automation for real, the user saw
+  macOS's Background Items list (System Settings → General → Login Items
+  & Extensions) flag the scan job's Python interpreter as "unidentified
+  developer" and seriously reconsidered the whole background-automation
+  approach over it — including whether a scheduled AI agent could run
+  `scan` instead of registering it directly with `launchd` (rejected: the
+  useful part of that idea, an agent auto-filing new transcripts
+  "wherever they belong," would mean uploading transcript content to a
+  cloud model on a schedule, which conflicts with this project's core
+  local-only promise; and "wherever they belong" isn't a generalizable
+  problem this project should try to solve at all — it's a personal
+  filing preference, different for every user). Given four concrete
+  options (skip background automation and run `scan` manually; accept the
+  warning as-is; try free personal code signing via a Just-an-Apple-ID
+  Xcode certificate; enroll in the paid $99/year Apple Developer Program
+  for a real Developer ID + notarization), **the user chose to accept the
+  warning as-is** — reaffirming the 2026-09-09 personal-use-only decision
+  above, not overriding it. No code change. If this comes up again: it is
+  expected, not a sign of a problem, and has now been reconsidered twice.
+- 2026-09-12 (same day, continued): User asked for this to be documented
+  so a future setup (by the user or anyone else who clones the repo) isn't
+  surprised by it. Added a note to `README.md`'s Setup section (right
+  after the `--enable-now` explanation, quoting the exact label — "Python
+  — Item from unidentified developer") plus a cross-referencing bullet
+  under Known limitations. No code change.
+- 2026-09-12 (same day, continued): Despite the above, the user kept
+  finding the whole background-automation posture (settings spread across
+  `~/Library/Application Support`, `~/Library/LaunchAgents`, `~/Library/
+  Logs`) more than they wanted for what was meant to be a simple personal
+  tool. Investigating this surfaced a real, separate incident: this
+  session's own earlier real-terminal testing of the setup menu (against
+  scratch `/tmp/vma-terminal-test/...` paths) had overwritten the *real*
+  `com.voicememoarchive.scan.plist` — `setup` always rewrites the single,
+  globally-labeled plist file regardless of which `--config`/`--state` it
+  was given, so the live plist ended up pointing at a scratch path that
+  was later deleted during cleanup. It was never `bootstrap`ed (confirmed
+  via `launchctl print`), so nothing was actually broken in practice, but
+  it was silently wrong. Also discussed and set aside having a scheduled
+  AI agent invoke `scan` in place of `launchd`: doesn't remove the need
+  for *some* OS-level scheduler under the hood, and it's unclear such an
+  agent would even run locally with access to the real Voice Memos
+  folder rather than in an isolated cloud sandbox. **Net decision: the
+  user is not using background automation at all for now.** Ran
+  `voice-memo-archive uninstall`, which removed the (already-stale) plist
+  file; real `config.json`/`state.json`/archive were confirmed untouched.
+  Going forward, the supported workflow for this user is running `scan`
+  manually. No code or `README.md` change needed for this — automation
+  remains a real, working, documented feature for anyone who does want
+  it; this is a personal-use choice, not a project capability change.
+  Also asked whether to relocate `config.json`/`state.json` into this
+  repo, now that no plist depends on their location — **user decided to
+  leave them at the default `~/Library/Application Support/...` location**
+  (relocation was about avoiding a stale-plist mismatch, which no longer
+  applies once automation itself is off). No change made; this is fully
+  resolved, not open.
 
 ## Deviations from the roadmap
 

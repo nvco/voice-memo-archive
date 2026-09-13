@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-from voice_memo_archive import launchd
 from voice_memo_archive.archive import write_archive_entry
 from voice_memo_archive.cli import build_parser, main
 from voice_memo_archive.io_utils import ScanLock
@@ -66,8 +65,7 @@ def test_scan_blocked_by_a_concurrent_scan_fails_cleanly_not_duplicated(capsys, 
     assert "scan_lock_held" in capsys.readouterr().err
 
 
-def test_doctor_reports_ok_on_a_clean_synthetic_setup(capsys, tmp_path, monkeypatch):
-    monkeypatch.setattr(launchd, "is_loaded", lambda: None)
+def test_doctor_reports_ok_on_a_clean_synthetic_setup(capsys, tmp_path):
     config_path = _write_synthetic_config(tmp_path)
     exit_code = main(
         ["doctor", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
@@ -188,11 +186,7 @@ def test_verify_reports_malformed_entries(capsys, tmp_path):
     assert "malformed" in err
 
 
-def test_setup_with_yes_writes_config_and_plist_without_enabling(capsys, tmp_path, monkeypatch):
-    # launchd.plist_path() is Path.home()-relative — must redirect it into
-    # tmp_path or this would write a real file under the actual user's
-    # ~/Library/LaunchAgents.
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+def test_setup_with_yes_writes_config(capsys, tmp_path):
     config_path = tmp_path / "config.json"
     state_path = tmp_path / "state.json"
     recordings_source = tmp_path / "recordings"
@@ -215,19 +209,16 @@ def test_setup_with_yes_writes_config_and_plist_without_enabling(capsys, tmp_pat
     out = capsys.readouterr().out
     assert exit_code == 0
     assert config_path.exists()
-    assert (tmp_path / "Library/LaunchAgents" / f"{launchd.LABEL}.plist").exists()
-    assert "Background automation not enabled" in out
     # Phase 7 exit criterion: users see what initial import will consider
     # before anything is written — must appear before the confirmation.
     assert "Initial import will consider 0 recording(s)." in out
 
 
-def test_setup_fails_cleanly_when_recordings_source_does_not_exist(capsys, tmp_path, monkeypatch):
+def test_setup_fails_cleanly_when_recordings_source_does_not_exist(capsys, tmp_path):
     # The candidate-count preview inside build_setup_plan reads the
     # recordings folder before anything is written; a missing/unreadable
     # source must fail cleanly (exit 1, a short message on stderr), not
     # crash with a raw traceback — matches how `scan` itself behaves.
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config_path = tmp_path / "config.json"
 
     exit_code = main(
@@ -252,13 +243,11 @@ def test_setup_fails_cleanly_when_recordings_source_does_not_exist(capsys, tmp_p
 def test_setup_interactive_menu_accepts_defaults_when_no_existing_config(
     capsys, tmp_path, monkeypatch
 ):
-    # Import mode, schedule mode, and scan interval are left off entirely so
-    # the menu must seed them from package defaults; pressing Enter at the
-    # menu accepts every shown value unchanged. recordings-source/
-    # archive-root are still given explicitly per this file's own convention
-    # of never touching cli.py's real Application-Support/Voice-Memos
-    # defaults.
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # Import mode is left off entirely so the menu must seed it from the
+    # package default; pressing Enter at the menu accepts every shown value
+    # unchanged. recordings-source/archive-root are still given explicitly
+    # per this file's own convention of never touching cli.py's real
+    # Application-Support/Voice-Memos defaults.
     responses = iter(["", "y"])  # menu: continue with no edits; confirm: yes
     monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     config_path = tmp_path / "config.json"
@@ -283,12 +272,9 @@ def test_setup_interactive_menu_accepts_defaults_when_no_existing_config(
     assert "Current setup:" in out
     written = json.loads(config_path.read_text())
     assert written["import_mode"] == "all"
-    assert written["schedule_mode"] == "monitoring"
-    assert written["scan_interval_seconds"] == 900
 
 
 def test_setup_interactive_menu_edits_a_setting_by_number(capsys, tmp_path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     # Menu: an invalid selection, then edit import mode (3) — an invalid
     # choice there, then a valid one ("date"), which immediately asks for
     # the now-required import-since date; back at the menu, continue; then
@@ -314,7 +300,7 @@ def test_setup_interactive_menu_edits_a_setting_by_number(capsys, tmp_path, monk
     )
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "Please enter one of: 1, 2, 3, 4, 5, 6" in out  # the "9" selection
+    assert "Please enter one of: 1, 2, 3, 4" in out  # the "9" selection
     assert "Please enter one of: all/date/new_only" in out  # the "bogus" mode
     written = json.loads(config_path.read_text())
     assert written["import_mode"] == "date"
@@ -326,7 +312,6 @@ def test_setup_interactive_menu_seeds_defaults_from_existing_config(capsys, tmp_
     # menu row's default except the one you want to change" — each default
     # must come from the *current* config.json, not the package's hardcoded
     # defaults. Per tasks/035-...md's "Also requested" note.
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     config_path = tmp_path / "config.json"
     state_path = tmp_path / "state.json"
     recordings_source = tmp_path / "recordings"
@@ -344,17 +329,18 @@ def test_setup_interactive_menu_seeds_defaults_from_existing_config(capsys, tmp_
             str(recordings_source),
             "--archive-root",
             str(archive_root),
-            "--schedule-mode",
-            "scheduled",
+            "--import-mode",
+            "new_only",
             "--yes",
         ]
     )
     assert first_run == 0
     capsys.readouterr()
 
-    # Second run: only scan-interval is given explicitly; everything else
-    # must be seeded from what's already in config.json, and accepted as-is
-    # by continuing past the menu with no edits.
+    # Second run: only import-since is given explicitly (harmless while
+    # import_mode stays "new_only"); everything else must be seeded from
+    # what's already in config.json, and accepted as-is by continuing past
+    # the menu with no edits.
     responses = iter(["", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
     second_run = main(
@@ -366,8 +352,6 @@ def test_setup_interactive_menu_seeds_defaults_from_existing_config(capsys, tmp_
             str(state_path),
             "--recordings-source",
             str(recordings_source),
-            "--scan-interval",
-            "1800",
         ]
     )
     assert second_run == 0
@@ -375,12 +359,10 @@ def test_setup_interactive_menu_seeds_defaults_from_existing_config(capsys, tmp_
     assert str(archive_root) in out  # shown in the menu, unchanged from before
     written = json.loads(config_path.read_text())
     assert written["archive_root"] == str(archive_root)
-    assert written["schedule_mode"] == "scheduled"  # preserved, not reset to "monitoring"
-    assert written["scan_interval_seconds"] == 1800
+    assert written["import_mode"] == "new_only"  # preserved, not reset to "all"
 
 
 def test_setup_declined_without_yes_writes_nothing(capsys, tmp_path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     # Every value-selecting flag is given explicitly, so the menu already
     # shows exactly what will be written; continue past it with no edits,
     # then decline the final "Proceed?" confirmation this test targets.
@@ -403,102 +385,11 @@ def test_setup_declined_without_yes_writes_nothing(capsys, tmp_path, monkeypatch
             str(tmp_path / "archive"),
             "--import-mode",
             "all",
-            "--schedule-mode",
-            "monitoring",
-            "--scan-interval",
-            "900",
         ]
     )
     assert exit_code == 0
     assert not config_path.exists()
     assert "cancelled" in capsys.readouterr().out
-
-
-def test_setup_enable_now_with_yes_calls_bootstrap_not_real_launchctl(
-    capsys, tmp_path, monkeypatch
-):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    calls = []
-    monkeypatch.setattr(launchd, "bootstrap", lambda path: calls.append(path))
-    recordings_source = tmp_path / "recordings"
-    recordings_source.mkdir()
-
-    exit_code = main(
-        [
-            "setup",
-            "--config",
-            str(tmp_path / "config.json"),
-            "--state",
-            str(tmp_path / "state.json"),
-            "--recordings-source",
-            str(recordings_source),
-            "--yes",
-            "--enable-now",
-        ]
-    )
-    assert exit_code == 0
-    assert len(calls) == 1
-    assert "Background automation enabled" in capsys.readouterr().out
-
-
-def test_uninstall_removes_the_plist_and_never_touches_the_archive(capsys, tmp_path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(launchd, "bootout", lambda: None)  # never invoke real launchctl
-    config_path = _write_synthetic_config(tmp_path)
-    from voice_memo_archive.config import load_config
-
-    archive_root = Path(load_config(config_path).archive_root)
-    write_archive_entry(archive_root, ARCHIVE_METADATA, "Hello world.")
-    plist_path = tmp_path / "Library/LaunchAgents" / f"{launchd.LABEL}.plist"
-    plist_path.parent.mkdir(parents=True)
-    plist_path.write_bytes(b"placeholder plist content")
-
-    exit_code = main(
-        ["uninstall", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
-    )
-
-    assert exit_code == 0
-    assert not plist_path.exists()
-    assert config_path.exists()  # not purged by default
-    # The archive is completely untouched — this is a structural
-    # guarantee (uninstall's code never reads archive_root at all), and
-    # this assertion proves the file really does still exist on disk.
-    entries = list(archive_root.rglob("*.md"))
-    assert len(entries) == 1
-    assert entries[0].read_text() != ""
-
-
-def test_uninstall_with_no_plist_installed_reports_that_cleanly(capsys, tmp_path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(launchd, "bootout", lambda: None)
-    config_path = _write_synthetic_config(tmp_path)
-    exit_code = main(
-        ["uninstall", "--config", str(config_path), "--state", str(tmp_path / "state.json")]
-    )
-    assert exit_code == 0
-    assert "No launchd job was installed" in capsys.readouterr().out
-
-
-def test_uninstall_purge_config_removes_config_and_state(tmp_path, monkeypatch):
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(launchd, "bootout", lambda: None)
-    config_path = _write_synthetic_config(tmp_path)
-    state_path = tmp_path / "state.json"
-    save_state(state_path, State())
-
-    exit_code = main(
-        [
-            "uninstall",
-            "--config",
-            str(config_path),
-            "--state",
-            str(state_path),
-            "--purge-config",
-        ]
-    )
-    assert exit_code == 0
-    assert not config_path.exists()
-    assert not state_path.exists()
 
 
 def test_parser_requires_a_command():
