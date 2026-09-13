@@ -36,9 +36,23 @@ uv pip install -e ".[dev]" --python .venv/bin/python
 
 (No `uv`? Plain `pip` works the same way: `python3.11 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"`.)
 
-This installs the `voice-memo-archive` command inside `.venv`. Run it as
-`.venv/bin/voice-memo-archive`, or activate the virtual environment first
-(`source .venv/bin/activate`) and just use `voice-memo-archive`.
+**This installs the `voice-memo-archive` command inside `.venv` only — it
+is not on your shell's `PATH`.** Every `voice-memo-archive ...` command
+shown anywhere below in this document needs either:
+
+```sh
+source .venv/bin/activate   # once per terminal session/tab, then just:
+voice-memo-archive scan
+```
+
+or the full path every time, no activation needed:
+
+```sh
+.venv/bin/voice-memo-archive scan
+```
+
+If you see `zsh: command not found: voice-memo-archive`, this is why —
+neither of the above was done in that terminal session yet.
 
 There is currently no signed, notarized, or App Store distribution — this
 is a source install for people comfortable cloning a repository and
