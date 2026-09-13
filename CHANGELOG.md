@@ -208,6 +208,12 @@ own "Plan history," and per-task deviations live in each task-plan file.
   itself still never deletes anything; this is the one explicit,
   separate, confirmation-gated way to. See
   `tasks/051-empty-archive-command.md`.
+- Made `README.md`'s Installation section state plainly, prominently, and
+  right where it's needed that `voice-memo-archive` lives inside `.venv`
+  only and isn't on `PATH` without activating it or using the full path —
+  added after a real `zsh: command not found` moment showed the original
+  one-line mention (right after the install commands, easy to scroll past)
+  wasn't enough.
 
 ### Removed
 
@@ -223,3 +229,7 @@ own "Plan history," and per-task deviations live in each task-plan file.
   than value for a personal-use tool. An old `config.json` with the
   now-removed fields still loads fine; they're simply ignored. See
   `tasks/050-remove-background-automation.md`.
+- Removed the parked "summarize the archive with your own AI tool" skill
+  idea (`tasks/future-ai-summary-skill.md`) — never started, and decided
+  it wasn't actually needed. See
+  `tasks/045-end-to-end-verification-and-release-readiness.md`.

@@ -84,11 +84,10 @@ what's done and what to do next._
 
 **Not done yet — next action:**
 
-- This user's own real machine still has a `config.json` with the two
-  now-ignored legacy keys sitting in it (harmless, per the "ignores
-  legacy fields" behavior above) — left as-is per the user's own explicit
-  decision not to relocate/edit it further (see `tasks/040-...md`'s final
-  session log entry).
+- (Resolved 2026-09-13, no longer applicable: the user's real
+  `config.json` — including its two legacy keys — no longer exists at
+  all, deleted as part of a full real-archive/config/state wipe done the
+  same session for an unrelated reason. Nothing left to reconcile here.)
 - `tasks/000-initial-build.md`'s Phase 7/Phase 8 sections still describe
   and check off the original `launchd` feature as built — deliberately
   *not* rewritten here; see this file's "Relationship to the original

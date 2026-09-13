@@ -11,7 +11,7 @@ personal-use only for now — "release readiness" in this phase's name means
 
 ## Status
 
-_Last updated: 2026-09-10. Read this section first in a new session to see
+_Last updated: 2026-09-13. Read this section first in a new session to see
 what's done and what to do next._
 
 **Done:**
@@ -110,10 +110,12 @@ what's done and what to do next._
   `tasks/035-...md`, not here:** `setup` is flag-driven, not the
   interactive prompt wizard the roadmap actually described. Deferred on
   the user's explicit direction until after this phase.
-- **A new, out-of-roadmap idea surfaced and deliberately deferred:** a
-  sample "summarize the archive with your own AI tool" skill. Recorded in
-  `tasks/future-ai-summary-skill.md` (no phase number — not part of the
-  original 9-phase plan), not started.
+- **A new, out-of-roadmap idea surfaced, deliberately deferred, then
+  dropped:** a sample "summarize the archive with your own AI tool"
+  skill, recorded in `tasks/future-ai-summary-skill.md` (no phase
+  number). Never started, and on 2026-09-13 the user decided it wasn't
+  actually needed — the file was removed rather than left sitting as a
+  stale, unstarted idea.
 
 **Not done yet — next action:**
 
@@ -126,18 +128,24 @@ what's done and what to do next._
   exercise one (e.g., a future needs_attention record is the natural
   moment to test `acknowledge` for real), rather than manufacturing an
   artificial failure just to test the path.
-- The setup-wizard gap and the AI-summary-skill idea are both tracked
-  elsewhere (`tasks/035-...md` and `tasks/future-ai-summary-skill.md`
-  respectively) — nothing to duplicate here.
+- The setup-wizard gap is tracked elsewhere (`tasks/035-...md`); the
+  AI-summary-skill idea is closed (see "Done" above, dropped 2026-09-13)
+  — nothing to duplicate here.
 - "Convert each verified defect or important gap into a new numbered task
   plan before release" — the one real gap found (the setup wizard) was
   recorded in the *existing* Phase 7 file rather than a new numbered one,
   since it's a gap in something Phase 7 already built, not a new phase.
-  The AI-summary-skill idea got a new (deliberately unnumbered — see that
-  file for why) task file since it's genuinely new scope. Both are
-  "recorded before treating [Phase 9] as complete," satisfying the intent
-  of this scope line even though neither literally added a new *numbered*
-  file.
+  The AI-summary-skill idea got its own (deliberately unnumbered) task
+  file at the time, satisfying "recorded before treating [Phase 9] as
+  complete" — since removed entirely (2026-09-13) once the user decided
+  the idea wasn't wanted, rather than left as permanent dead weight.
+
+**Phase 9 is now closed** (2026-09-13) — every exit criterion below is
+satisfied; see the session log for the two remaining items closed that
+day (this file's earlier "Not done yet" verification-matrix gaps are
+still genuinely open, deliberately, per the note above — they don't block
+closing the phase, matching how this file already treated them since
+2026-09-10).
 
 ## Scope and decisions to validate
 
@@ -157,12 +165,17 @@ what's done and what to do next._
 - [x] Run the full automated suite, package smoke tests, clean-install
       test, and repository audit for private fixtures and unintended
       network dependencies.
-- [ ] Review setup, normal workflow, recovery, privacy, support matrix,
+- [x] Review setup, normal workflow, recovery, privacy, support matrix,
       limitations, and removal documentation. _`AGENTS.md`'s developer-
       facing setup docs are confirmed accurate (the clean-install smoke
-      test above exercises them directly); the user-facing public
-      documentation this line really means is Phase 8's deferred scope —
-      not relevant while this stays personal-use only._
+      test above exercises them directly). `README.md` was substantially
+      rewritten across 2026-09-12/13 (Installation's `.venv`/`PATH`
+      requirement made unmissable, Setup, Everyday use, the two supported
+      usage modes, Privacy, Uninstalling, Known limitations) and is now
+      accurate, complete, and privacy-safe for the distribution form
+      actually decided on (`tasks/040-...md`: source install, shareable
+      via GitHub) — see the 2026-09-13 exit-criterion note below for why
+      this closes the line rather than deferring it further._
 - [x] Convert each verified defect or important gap into a new numbered
       task plan before release; do not hide it in release notes. _The
       setup-wizard gap went into the existing Phase 7 file (a gap in
@@ -191,8 +204,24 @@ Unchanged from `tasks/000-initial-build.md` Phase 9:
       above: no tracked `.m4a`/`.qta`/audio file of any kind, no tracked
       real filesystem path, `.local/` untracked and unreferenced except
       by documentation describing the rule itself._
-- [ ] Release documentation and known limitations are ready for public
-      review. _Not relevant while personal-use only — see Phase 8._
+- [x] Release documentation and known limitations are ready for public
+      review. _2026-09-13: closed, on the user's explicit "whatever you
+      think" direction. This was left open reasoning "not relevant while
+      personal-use only," but that framing was already outdated —
+      `tasks/040-...md`'s 2026-09-09 decision settled on a real,
+      shareable distribution form (source install via GitHub clone), not
+      pure private use. Holding this criterion open waiting for a
+      signed/notarized general-audience release would be holding it to a
+      bar this project never targeted (see `README.md`'s own "no
+      signed... distribution... not a double-click installer for a
+      general audience" line). Judged against the form actually decided
+      on: `README.md` now covers requirements, installation (including
+      the `.venv`/`PATH` gotcha, made prominent after a real user hit
+      it), setup, everyday use, both supported usage modes, privacy
+      guarantees (each one backed by an automated test, not just
+      asserted), uninstalling, and known limitations — accurate,
+      complete, and contains no private data. Good enough to point a
+      stranger at._
 
 ## Session log
 
@@ -222,6 +251,18 @@ _Append one entry per work session: date, what was built/decided, outcome._
   `tasks/future-ai-summary-skill.md`, both deliberately deferred per the
   user's direction. Outcome: all real-data checks passed; no code
   changes this session (verification and documentation only).
+- 2026-09-13: Closed out the two remaining open items from this file.
+  User decided the AI-summary-skill idea wasn't actually needed;
+  `tasks/future-ai-summary-skill.md` was removed entirely (unstarted, no
+  code affected). Separately, asked to close the public-review
+  documentation question with "whatever you think" — judged it already
+  satisfied for the distribution form actually decided in
+  `tasks/040-...md` (source install, not a signed general-audience
+  release) given `README.md`'s current state (Requirements, Installation
+  with the `.venv`/`PATH` gotcha made prominent, Setup, Everyday use, the
+  two supported usage modes, Privacy, Uninstalling, Known limitations —
+  all accurate, complete, no private data). Checked off both remaining
+  exit criteria; **Phase 9 is now fully closed.** No code changes.
 
 ## Deviations from the roadmap
 

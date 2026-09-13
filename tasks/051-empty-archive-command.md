@@ -74,10 +74,13 @@ what's done and what to do next._
 
 **Not done yet — next action:**
 
-- Not yet exercised against this user's actual real archive/setup on this
-  machine — only scratch/synthetic paths so far. The user's real
-  archive was already wiped manually (as part of the same session, before
-  this command existed) rather than via this new command.
+- `empty` itself hasn't been run against this user's real archive yet —
+  only scratch/synthetic paths so far. (`scan` *has* since run for real
+  post-wipe, without ever re-running `setup` — the user relied on
+  `load_config`'s package defaults, which worked as designed — and
+  produced 20 real archived transcripts. `empty` against that real
+  archive is still an open, easy next step whenever the user wants to
+  actually use the staging-area workflow for real.)
 - No flag to also reset `state.json` in the same step. Deliberately left
   out: the design intent is that a recording already marked `processed`
   should *stay* marked that way after `empty`, so a normal `scan`

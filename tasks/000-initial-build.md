@@ -25,7 +25,7 @@ When an issue changes product intent, update the brief first. When it changes se
 6. [x] Operational state, retries, and recovery
 7. [x] Setup, automation, and diagnostics
 8. [x] Packaging, permissions, and privacy
-9. [ ] End-to-end verification and release readiness
+9. [x] End-to-end verification and release readiness
 
 No implementation phase begins until its stated dependencies and exit criteria are met. A failure to validate an Apple format must create a visible unsupported case or a revised plan; it must not trigger a fallback to third-party transcription.
 
@@ -275,7 +275,7 @@ All prior phases.
 - [x] At least one real synced `.m4a` and one real synced `.qta` complete the archive flow with their visible Apple transcript preserved.
 - [x] Expected non-success states are visible and repairable.
 - [x] No personal audio, transcript, title, identifier, or raw private note is tracked in Git.
-- [ ] Release documentation and known limitations are ready for public review.
+- [x] Release documentation and known limitations are ready for public review.
 
 ## Definition of done
 
@@ -287,6 +287,16 @@ All prior phases.
 
 ## Plan history
 
+- 2026-09-13: Phase 9's last two open items closed (see
+  `tasks/045-...md`'s 2026-09-13 session log entry): the AI-summary-skill
+  idea was dropped and its task file removed, and the "release
+  documentation ready for public review" exit criterion was judged
+  satisfied against the distribution form actually decided in
+  `tasks/040-...md` (source install, not a signed general-audience
+  release) — not held open waiting for a form of release this project
+  never targeted. **Every phase's exit criteria are now met except Phase
+  1's**, which remains genuinely, deliberately open (see `tasks/005-...md`
+  — real-sample edge cases deprioritized, not forgotten).
 - 2026-09-12: Phase 7's `launchd` background-automation feature — built
   and verified as described below at the time — was later removed
   entirely, on the user's explicit decision after real-world friction
