@@ -3,12 +3,15 @@
 A privacy-first macOS command-line tool that exports Apple Voice Memos'
 existing native transcripts into a durable, local Markdown archive.
 
-The archive is the source of truth. This tool does **not** re-transcribe
-audio, generate AI summaries, upload recordings, or modify Voice Memos
-storage in any way. It only reads the transcript Apple already created and
-writes it out as plain Markdown files, grouped by year/month/day, that you
-own and can read with any text editor forever — independent of Apple, this
-tool, or any particular app.
+The archive is the source of truth, for as long as you want it to be —
+see [Two ways to use this tool](#two-ways-to-use-this-tool) if your plan
+is to move transcripts elsewhere and clear this folder out afterward
+instead of keeping it permanently. Either way, this tool does **not**
+re-transcribe audio, generate AI summaries, upload recordings, or modify
+Voice Memos storage in any way. It only reads the transcript Apple
+already created and writes it out as plain Markdown files, grouped by
+year/month/day, that you own and can read with any text editor forever —
+independent of Apple, this tool, or any particular app.
 
 ## Requirements
 
@@ -86,6 +89,36 @@ voice-memo-archive acknowledge --id <recording-id>   # quiet it without retrying
 voice-memo-archive verify                      # check the archive tree for problems
 voice-memo-archive reconcile                   # rebuild tracking state from the archive itself
 ```
+
+### Two ways to use this tool
+
+There are two equally valid, fully supported ways to use this tool, and
+which one you're doing is entirely up to you — nothing about `scan` or
+`setup` changes either way:
+
+- **As a permanent archive.** Just never run `empty`. The Markdown files
+  accumulate under your archive destination forever, exactly as described
+  above — this is the default, and the behavior the rest of this document
+  assumes.
+- **As a temporary staging area.** Run `scan` to pull transcripts in,
+  import that content into wherever you actually keep it long-term (your
+  own notes system, an AI tool, whatever), then run `empty` to clear the
+  archive folder back out. Repeat the cycle whenever you like — `scan`
+  will keep picking up new recordings without ever re-adding ones you've
+  already cleared, because clearing the archive doesn't undo a
+  recording's tracked status (more below).
+
+```sh
+voice-memo-archive empty       # delete every archived transcript
+```
+
+This only ever deletes files it recognizes as its own archive entries
+(valid or malformed `.md` files); anything else it finds in the archive
+folder is left alone and reported. It never touches `config.json` or
+`state.json` — a recording already marked as archived stays that way, so
+a later `scan` won't re-add it just because its `.md` file is gone. `scan`
+itself never deletes anything; `empty` is the one explicit, separate
+command for it, and it asks for confirmation unless you pass `--yes`.
 
 ## Privacy
 

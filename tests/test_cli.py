@@ -186,6 +186,56 @@ def test_verify_reports_malformed_entries(capsys, tmp_path):
     assert "malformed" in err
 
 
+def test_empty_reports_nothing_to_delete_on_a_clean_empty_archive(capsys, tmp_path):
+    config_path = _write_synthetic_config(tmp_path)
+    exit_code = main(["empty", "--config", str(config_path)])
+    assert exit_code == 0
+    assert "already empty" in capsys.readouterr().out
+
+
+def test_empty_deletes_archived_transcripts_with_yes(capsys, tmp_path):
+    config_path = _write_synthetic_config(tmp_path)
+    from voice_memo_archive.config import load_config
+
+    archive_root = Path(load_config(config_path).archive_root)
+    write_archive_entry(archive_root, ARCHIVE_METADATA, "Hello world.")
+
+    exit_code = main(["empty", "--config", str(config_path), "--yes"])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Deleted 1 archived transcript(s)" in out
+    assert list(archive_root.rglob("*.md")) == []
+
+
+def test_empty_declined_without_yes_deletes_nothing(capsys, tmp_path, monkeypatch):
+    config_path = _write_synthetic_config(tmp_path)
+    from voice_memo_archive.config import load_config
+
+    archive_root = Path(load_config(config_path).archive_root)
+    write_archive_entry(archive_root, ARCHIVE_METADATA, "Hello world.")
+    monkeypatch.setattr("builtins.input", lambda prompt="": "n")
+
+    exit_code = main(["empty", "--config", str(config_path)])
+    assert exit_code == 0
+    assert "Cancelled" in capsys.readouterr().out
+    assert len(list(archive_root.rglob("*.md"))) == 1
+
+
+def test_empty_never_touches_config_or_state(tmp_path):
+    config_path = _write_synthetic_config(tmp_path)
+    state_path = tmp_path / "state.json"
+    save_state(state_path, State())
+    from voice_memo_archive.config import load_config
+
+    archive_root = Path(load_config(config_path).archive_root)
+    write_archive_entry(archive_root, ARCHIVE_METADATA, "Hello world.")
+
+    main(["empty", "--config", str(config_path), "--yes"])
+
+    assert config_path.exists()
+    assert state_path.exists()
+
+
 def test_setup_with_yes_writes_config(capsys, tmp_path):
     config_path = tmp_path / "config.json"
     state_path = tmp_path / "state.json"

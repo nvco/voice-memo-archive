@@ -11,12 +11,19 @@ transcript content. `archive_root` is expected already resolved (e.g.
 `Path(config.archive_root).expanduser()`); this module does not read
 `config.py` itself.
 
-Conflict policy: a completed archive file is never overwritten or deleted.
-If a write is requested for a path that already holds a different source
-filename, source fingerprint, or transcript, `write_archive_entry` raises
+Conflict policy: a completed archive file is never overwritten, and
+`scan`/`write_archive_entry` never delete one either. If a write is
+requested for a path that already holds a different source filename,
+source fingerprint, or transcript, `write_archive_entry` raises
 `ArchiveError(ErrorCategory.ARCHIVE_CONFLICT, ...)` instead — the existing
 file is left exactly as it was, so historical text is always preserved. A
 write that exactly matches what's already on disk is a silent no-op.
+
+`empty_archive` is the one deliberate exception: an explicit, separately
+user-invoked deletion of every recognized archive entry (never a side
+effect of scanning), added in
+`tasks/051-empty-archive-command.md` once the archive stopped being
+required to be a durable, permanent store for every user of this tool.
 """
 
 from __future__ import annotations
@@ -191,6 +198,47 @@ def inspect_archive(archive_root: Path) -> ArchiveInspection:
         entries.append(ArchiveEntry(path=path, metadata=metadata))
     return ArchiveInspection(
         entries=tuple(entries), malformed=tuple(malformed), orphaned=tuple(orphaned)
+    )
+
+
+@dataclass(frozen=True)
+class EmptyResult:
+    deleted_count: int
+    left_count: int  # orphaned (non-`.md`) files found and deliberately left alone
+
+
+def empty_archive(archive_root: Path) -> EmptyResult:
+    """Delete every recognized archive entry — valid or malformed `.md`
+    files alike — then remove any subdirectories left empty as a result.
+
+    Deliberately narrow: only files `inspect_archive` already recognizes
+    as belonging to this tool are ever removed. An orphaned (non-`.md`)
+    file is left exactly where it is and counted, never guessed at or
+    swept away — the same "never touch what it doesn't clearly own"
+    discipline as every other command in this project. `config.json`/
+    `state.json` are untouched; a recording already marked `processed`
+    stays that way, so a normal `scan` afterward does not re-add it.
+    """
+    inspection = inspect_archive(archive_root)
+    for entry in inspection.entries:
+        entry.path.unlink()
+    for malformed in inspection.malformed:
+        malformed.path.unlink()
+
+    # Deepest directories first, so a now-empty parent can be removed too.
+    for directory in sorted(
+        (p for p in archive_root.rglob("*") if p.is_dir()),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
+        try:
+            directory.rmdir()
+        except OSError:
+            pass  # not empty — an orphaned file (or a nested one) lives here
+
+    return EmptyResult(
+        deleted_count=len(inspection.entries) + len(inspection.malformed),
+        left_count=len(inspection.orphaned),
     )
 
 

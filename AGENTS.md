@@ -5,7 +5,7 @@ All agents should read and update this file.
 
 ## Purpose
 
-Voice Memo Archive is a privacy-first macOS utility that exports Apple Voice Memos’ existing native transcripts into a durable Markdown archive. The archive is the source of truth. This project does not re-transcribe audio, generate AI summaries, upload recordings, or modify Voice Memos storage.
+Voice Memo Archive is a privacy-first macOS utility that exports Apple Voice Memos’ existing native transcripts into a durable Markdown archive. The archive is the source of truth by default, and stays that way unless the user explicitly runs `empty` (see the invariant below) — this tool supports both "keep the archive permanently" and "use it as a temporary staging area before importing elsewhere" as equally valid usage patterns. This project does not re-transcribe audio, generate AI summaries, upload recordings, or modify Voice Memos storage.
 
 ## Decision context
 
@@ -38,6 +38,7 @@ than silently changing, discarding, or replacing source material.
 - Keep generated YAML metadata factual. Do not add AI-generated summaries, titles, tags, or interpretations to the source archive.
 - Use `config.json` for user settings and `state.json` for operational state, retry tracking, and scan history.
 - Do not create archive files for empty or transcript-less recordings.
+- `scan` never deletes an archive entry, for any reason. The only way to remove archived transcripts is the explicit, separately user-invoked `empty` command (see `tasks/051-empty-archive-command.md`) — never a side effect of scanning, setup, or any other command.
 - Provide a command-line interface only; do not add a separate graphical application. Every run is a one-shot, user-invoked `scan` — there is no background/scheduled automation (removed; see `tasks/050-remove-background-automation.md`).
 
 ## Development setup

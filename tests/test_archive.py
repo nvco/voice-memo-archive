@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from voice_memo_archive.archive import (
+    empty_archive,
     inspect_archive,
     read_archive_entry,
     rebuild_state_from_archive,
@@ -175,6 +176,47 @@ def test_inspect_archive_flags_non_markdown_files_as_orphaned(tmp_path: Path):
     inspection = inspect_archive(tmp_path)
     assert len(inspection.entries) == 1
     assert inspection.orphaned == (stray,)
+
+
+def test_empty_archive_deletes_valid_and_malformed_but_not_orphaned(tmp_path: Path):
+    write_archive_entry(tmp_path, BASE_METADATA, "Hello world.")
+    bad_path = tmp_path / "2024" / "01" / "15" / "bad.md"
+    bad_path.write_text("not a valid archive file at all", encoding="utf-8")
+    stray = tmp_path / "2024" / "01" / "15" / ".stray.md.abc123.tmp"
+    stray.write_text("leftover from a killed process", encoding="utf-8")
+
+    result = empty_archive(tmp_path)
+
+    assert result.deleted_count == 2  # the valid entry + the malformed one
+    assert result.left_count == 1  # the orphaned stray file
+    assert stray.exists()  # never touched
+    remaining = inspect_archive(tmp_path)
+    assert remaining.entries == ()
+    assert remaining.malformed == ()
+    assert len(remaining.orphaned) == 1
+
+
+def test_empty_archive_removes_now_empty_date_directories(tmp_path: Path):
+    write_archive_entry(tmp_path, BASE_METADATA, "Hello world.")
+    empty_archive(tmp_path)
+    assert not (tmp_path / "2024").exists()
+
+
+def test_empty_archive_leaves_directories_holding_an_orphaned_file(tmp_path: Path):
+    write_archive_entry(tmp_path, BASE_METADATA, "Hello world.")
+    stray = tmp_path / "2024" / "01" / "15" / "not-ours.txt"
+    stray.write_text("unrelated content", encoding="utf-8")
+
+    empty_archive(tmp_path)
+
+    assert stray.exists()
+    assert (tmp_path / "2024" / "01" / "15").exists()
+
+
+def test_empty_archive_on_missing_root_is_a_harmless_no_op(tmp_path: Path):
+    result = empty_archive(tmp_path / "does-not-exist")
+    assert result.deleted_count == 0
+    assert result.left_count == 0
 
 
 def test_rebuild_state_from_archive_reconstructs_fingerprint(tmp_path: Path):

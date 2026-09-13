@@ -199,6 +199,15 @@ own "Plan history," and per-task deviations live in each task-plan file.
 - Replaced `setup`'s sequential interactive wizard with a single-screen
   menu showing every setting and its current value at once, editable by
   number in any order. See `tasks/035-setup-automation-and-diagnostics.md`.
+- Added `voice-memo-archive empty`: deletes every archived transcript
+  this tool recognizes as its own (valid or malformed `.md` entries),
+  leaving anything unrecognized in the archive folder untouched, and
+  never touching `config.json`/`state.json`. For workflows where the
+  archive is a temporary staging area (content gets imported elsewhere,
+  then cleared here) rather than a required permanent store — `scan`
+  itself still never deletes anything; this is the one explicit,
+  separate, confirmation-gated way to. See
+  `tasks/051-empty-archive-command.md`.
 
 ### Removed
 

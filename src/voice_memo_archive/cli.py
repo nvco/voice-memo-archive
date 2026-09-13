@@ -160,6 +160,47 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return 0 if not inspection.malformed and not inspection.orphaned else 1
 
 
+def _cmd_empty(args: argparse.Namespace) -> int:
+    """Delete every recognized archived transcript. Never touches config/state.
+
+    See `tasks/051-empty-archive-command.md`: added on the user's explicit
+    request for a workflow where the archive is a temporary staging area
+    (content gets imported into a separate system, then cleared here), not
+    a required permanent store. Deliberately its own narrow command, not a
+    flag on an existing one, so it's never triggered by accident.
+    """
+    from . import archive, config
+    from .paths import redact_home_path
+
+    cfg = config.load_config(args.config)
+    archive_root = Path(cfg.archive_root).expanduser()
+    inspection = archive.inspect_archive(archive_root)
+    total = len(inspection.entries) + len(inspection.malformed)
+
+    if total == 0:
+        print("Archive is already empty — nothing to delete.")
+        if inspection.orphaned:
+            print(f"{len(inspection.orphaned)} unrecognized file(s) left untouched.")
+        return 0
+
+    print(
+        f"This will delete {total} archived transcript(s) under {redact_home_path(archive_root)}."
+    )
+    if inspection.orphaned:
+        print(f"{len(inspection.orphaned)} unrecognized file(s) there will be left untouched.")
+
+    if not args.yes:
+        answer = input("Proceed? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("Cancelled; nothing was deleted.")
+            return 0
+
+    result = archive.empty_archive(archive_root)
+    print(f"Deleted {result.deleted_count} archived transcript(s).")
+    print("config.json and state.json were not touched.")
+    return 0
+
+
 def _prompt_text(label: str, default: str) -> str:
     answer = input(f"{label} [{default}]: ").strip()
     return answer or default
@@ -386,6 +427,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     verify_parser.set_defaults(func=_cmd_verify)
+
+    empty_parser = subparsers.add_parser(
+        "empty",
+        help="delete every archived transcript (never touches config.json/state.json)",
+    )
+    empty_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    empty_parser.add_argument(
+        "--yes", action="store_true", help="skip the confirmation prompt (for scripted use)"
+    )
+    empty_parser.set_defaults(func=_cmd_empty)
 
     setup_parser = subparsers.add_parser(
         "setup", help="configure source, destination, and import scope"
