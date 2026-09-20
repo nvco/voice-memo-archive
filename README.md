@@ -1,5 +1,11 @@
 # Voice Memo Archive
 
+> **No longer maintained.** It worked as of September 2026, but I've
+> stopped developing it. I now record straight into the app where each note
+> belongs, so exporting from Voice Memos is no longer a step I need. If you
+> have a backlog of existing Voice Memos transcripts you want out as
+> Markdown, the tool still does that.
+
 A privacy-first macOS command-line tool that exports Apple Voice Memos'
 existing native transcripts into a durable, local Markdown archive.
 
